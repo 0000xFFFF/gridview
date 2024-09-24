@@ -6,7 +6,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-packager . gridview --platform=linux --arch=x64 --out=release-builds --icon=assets/icon.png"
+    "pack": "electron-packager . gridview --overwrite --platform=linux --arch=x64 --out=release-builds --icon=assets/icon.png"
   },
   "build": {
     "appId": "com.0000xFFFF.gridview",
