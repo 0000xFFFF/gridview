@@ -15,3 +15,5 @@
 ```
 gridview
 ```
+###### Or start it from your app manager:
+<img src="preview/apps.png">
