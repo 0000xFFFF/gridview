@@ -11,10 +11,12 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false // Ensure this is set to false for IPC to work
-    }
+    },
+    icon: path.join(app.getAppPath(), 'assets', 'icon.ico') // Set application icon
   });
 
-  win.loadFile('index.html');
+  const startUrl = path.join(app.getAppPath(), 'src', 'index.html');
+  win.loadFile(startUrl);
 
   const menu = Menu.buildFromTemplate([
     {

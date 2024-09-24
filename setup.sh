@@ -1,2 +1,3 @@
 npm init -y
-npm install electron --save-dev
+npm install --save-dev electron
+npm install --save-dev electron-builder
