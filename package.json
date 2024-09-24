@@ -9,7 +9,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "masonry grid layout image viewer",
   "devDependencies": {
     "electron": "^32.1.2"
   }
