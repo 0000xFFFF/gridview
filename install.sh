@@ -1,4 +1,6 @@
 #!/bin/bash -x
+npm install
+npm run pack
 
 # Define the relative path to the icon
 relative_icon_path="assets/icon.png"

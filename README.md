@@ -4,7 +4,7 @@
 
 # Installation
 ```
-./setup-build-install.sh
+./install.sh
 ```
 
 ## Requirements
