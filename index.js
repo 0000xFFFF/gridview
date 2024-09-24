@@ -58,12 +58,12 @@ app.whenReady().then(createWindow);
 
 
 async function selectDirectory() {
-  const result = await dialog.showOpenDialog(win, {
-    properties: ['openDirectory']
-  });
-
+  const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
   if (result.canceled) { return null; } // No directory was chosen
-  else { return getMediaDirectories(result.filePaths[0]); } // Return media files from the selected directory
+
+  const dirPath = result.filePaths[0];
+  console.log(`selected dir: ${dirPath}`)
+  return getMediaDirectories(dirPath); // Return media files from the selected directory
 }
 
 // Function to retrieve directories and files
@@ -118,6 +118,7 @@ function getMediaFiles(dirPath) {
 
         // Check if the file has a media extension
         if (mediaExtensions.includes(extname)) {
+          console.log(fullPath);
           mediaFiles.push({
             name: file,
             path: fullPath,  // Full path to the file
