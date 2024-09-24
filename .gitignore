@@ -44,3 +44,6 @@ yarn-error.log*
 # Optional dependencies
 package-lock.json
 yarn.lock
+
+# Builds
+release-builds

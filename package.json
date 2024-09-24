@@ -12,10 +12,8 @@
     "appId": "com.0000xFFFF.gridview",
     "linux": { "target": [ "AppImage" ] }
   },
-  "dependencies": {
-    "electron": "^32.1.2"
-  },
   "devDependencies": {
+    "electron": "^32.1.2",
     "electron-packager": "^15.5.0"
   }
 }
