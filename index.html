@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>gridview</title>
+        <link rel="icon" type="image/x-icon" href="favicon.ico">
+        <link rel="stylesheet" href="styles.css">
+        <script defer src="render.js"></script>
+    </head>
+    <body>
+        <div id="topbar">
+            <label class="checkboxContainer" title="Enable Zoom on Hover (P)">
+                <input id="setting_cb_hoverZoom" type="checkbox">
+                <span class="checkmark">
+                </span>
+            </label>
+            
+            <div class="sliderCont">
+                <input title="Columns (LEFT, RIGHT)" id="setting_slider_cols" type="range" min="1" max="10" step="1" class="slider">
+                <p id="setting_slider_cols_label" class="sliderLabel">...</p>
+            </div>
+        </div>
+
+        <div id="media-dirs"></div>
+    </body>
+</html>
