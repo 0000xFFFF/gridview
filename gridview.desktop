@@ -1,0 +1,7 @@
+[Desktop Entry]
+Version=1.0
+Name=gridview
+Exec=release-builds/gridview-linux-x64/gridview
+Icon=assets/icon.png
+Type=Application
+Terminal=false

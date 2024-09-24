@@ -10,7 +10,10 @@
   },
   "build": {
     "appId": "com.0000xFFFF.gridview",
-    "linux": { "target": [ "AppImage" ] }
+    "linux": {
+      "icon": "assets/icon.png",
+      "target": [ "AppImage" ]
+    }
   },
   "devDependencies": {
     "electron": "^32.1.2",
