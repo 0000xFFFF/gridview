@@ -5,8 +5,6 @@ const path = require('path');
 let win;
 
 function createWindow() {
-  console.log(path.join(app.getAppPath(), 'assets', 'icon.ico'));
-
   win = new BrowserWindow({
     width: 800,
     height: 600,
