@@ -13,7 +13,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
-            zoomFactor: 0.01,
+            zoomFactor: 1,
             preload: path.resolve(path.join('src', 'preload.js'))
         },
         icon: path.join(app.getAppPath(), 'assets', 'icon.png') // Set application icon
