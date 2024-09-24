@@ -64,8 +64,12 @@ function addChildImage(div_file, file, div_file_info) {
 function addChildVideo(div_file, file, div_file_info) {
     return new Promise((resolve) => {
         const video = document.createElement('video');
+        video.autoplay = true;
+        video.muted = true;
+        video.loop = true;
+        video.controls = false;
         video.src = `file://${file.path}`;
-        video.controls = true;
+        video.addEventListener('click', () => { video.muted = !video.muted; });
         div_file.appendChild(video);
         resolve(); // Immediately resolve since no loading is required for video thumbnails
     });
