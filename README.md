@@ -3,6 +3,8 @@
 # Installation
 ```
 ./setup.sh
+./build.sh
+./install.sh
 ```
 
 ## Requirements
@@ -11,7 +13,5 @@
 
 # Running
 ```
-./run.sh
+gridview
 ```
-
-
