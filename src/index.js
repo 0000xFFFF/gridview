@@ -12,14 +12,12 @@ function createWindow() {
         height: 600,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: true,
+            audio: true,
             zoomFactor: 1,
             preload: path.resolve(path.join(app.getAppPath(), 'src', 'preload.js'))
         },
         icon: path.join(app.getAppPath(), 'assets', 'icon.png') // Set application icon
     });
-
-    win.webContents.setZoomFactor(1); 
 
     const startUrl = path.join(app.getAppPath(), 'src', 'index.html');
     win.loadFile(startUrl);
@@ -30,12 +28,7 @@ function createWindow() {
             submenu: [
                 {
                     label: 'Select Directory',
-                    click: async () => {
-                        const selectedDir = await selectDirectory();
-                        if (selectedDir) {
-                            win.webContents.send('selected-directory', selectedDir);  // Send selected directory to renderer
-                        }
-                    }
+                    click: selectDirectoryAndSend
                 },
                 { type: 'separator' },
                 {
@@ -63,14 +56,26 @@ function createWindow() {
 app.whenReady().then(createWindow);
 
 
+async function selectDirectoryAndSend() {
+    const selectedDir = await selectDirectory();
+    if (selectedDir) {
+        win.webContents.send('selected-directory', selectedDir);  // Send selected directory to renderer
+    }
+}
+
 async function selectDirectory() {
     const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
     if (result.canceled) { return null; } // No directory was chosen
 
     const dirPath = result.filePaths[0];
+    return await loadDir(dirPath);
+}
+
+
+async function loadDir(dirPath) {
     //console.log(`selected dir: ${dirPath}`);
     win.setTitle(`GridView - ${dirPath}`);
-    return getMediaDirectories(dirPath); // Return media files from the selected directory
+    return await getMediaDirectories(dirPath);
 }
 
 // Function to retrieve directories and files
@@ -159,7 +164,10 @@ function openFile(filePath) {
 // IPC listeners
 ipcMain.on('select-file', (event, filePath) => { selectFile(filePath); });
 ipcMain.on('open-file', (event, filePath) => { openFile(filePath); });
-
+ipcMain.on('drop-folder', async (event, dirPath) => {
+    const directories = await loadDir(dirPath);
+    win.webContents.send('selected-directory', directories);
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
