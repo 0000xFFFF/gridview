@@ -52,6 +52,7 @@ function addChildImage(div_file, file, div_file_info) {
         // Image popup on hover
         div_file.addEventListener('mouseenter', function () {
             if (!setting_hoverZoom) { return; }
+            img_popup.src = img.src;
             img_popup.style.display = 'block';
         });
         div_file.addEventListener('mouseleave', function () {
