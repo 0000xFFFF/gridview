@@ -19,11 +19,8 @@
   },
   "devDependencies": {
     "@electron/packager": "^18.3.5",
-    "electron": "^32.1.2",
-    "masonry-layout": "^4.2.2"
+    "electron": "^32.1.2"
   },
   "keywords": [],
-  "license": "ISC",
-  "dependencies": {
-  }
+  "license": "ISC"
 }
