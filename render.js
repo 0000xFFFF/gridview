@@ -42,7 +42,6 @@ function topbar_setup() {
 
     // setting up keyboard events for topbar
     document.addEventListener('keydown', (event) => {
-        console.log(event.key);
         switch (event.key) {
             case 'p': hoverZoom_check(); break;
             case 'ArrowLeft': slider_left(); break;

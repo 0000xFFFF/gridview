@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, globalShortcut } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -31,6 +31,13 @@ function createWindow() {
         },
         { type: 'separator' },
         {
+          label: 'Show Dev Tools',
+          click: () => {
+            win.webContents.openDevTools(); // Opens the DevTools for the current window
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'Quit',
           role: 'quit'
         }
@@ -41,6 +48,10 @@ function createWindow() {
 
   Menu.setApplicationMenu(menu);
 
+  // Register the shortcut for opening Developer Tools
+  globalShortcut.register('Control+Shift+I', () => {
+    win.webContents.openDevTools();
+  });
 }
 
 app.whenReady().then(createWindow);
