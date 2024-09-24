@@ -10,8 +10,8 @@ function addFileInfo(div_file, file) {
     div_file_info_name.className = 'media-file-info-name';
     div_file_info_name.addEventListener('mouseup', (event) => {
         switch (event.button) {
-            case 1: window.electronAPI.openFile(file.path); break;
-            case 2: window.electronAPI.selectFile(file.path); break;
+            case 1: ipcRenderer.send('open-file', file.path); break;
+            case 2: ipcRenderer.send('select-file', file.path); break;
             img_popup.style.display = 'block';
         }
     });
