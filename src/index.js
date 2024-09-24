@@ -62,7 +62,7 @@ async function selectDirectory() {
   if (result.canceled) { return null; } // No directory was chosen
 
   const dirPath = result.filePaths[0];
-  console.log(`selected dir: ${dirPath}`);
+  //console.log(`selected dir: ${dirPath}`);
   win.setTitle(`GridView - ${dirPath}`);
   return getMediaDirectories(dirPath); // Return media files from the selected directory
 }
@@ -119,7 +119,7 @@ function getMediaFiles(dirPath) {
 
         // Check if the file has a media extension
         if (mediaExtensions.includes(extname)) {
-          console.log(fullPath);
+          //console.log(fullPath);
           mediaFiles.push({
             name: file,
             path: fullPath,  // Full path to the file

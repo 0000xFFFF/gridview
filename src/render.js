@@ -84,7 +84,16 @@ ipcRenderer.on('selected-directory', (event, directories) => {
             // Info
             const div_file_info = document.createElement('p');
             div_file_info.className = 'media-file-info';
-            div_file_info.textContent = `${file.width}x${file.height}  ${file.name}`;
+
+            const div_file_info_t1 = document.createElement('p');
+            div_file_info_t1.textContent = `${file.width}x${file.height}`;
+            div_file_info.appendChild(div_file_info_t1);
+            
+            const div_file_info_t2 = document.createElement('b');
+            div_file_info_t2.textContent = `${file.name}`;
+            div_file_info.appendChild(div_file_info_t2);
+
+
             div_file.addEventListener('mouseover', function () {
                 div_file_info.style.display = 'block';
                 div_file_info.style.opacity = '1'; // Make it visible
