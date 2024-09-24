@@ -2,9 +2,7 @@
 
 # Installation
 ```
-./setup.sh
-./build.sh
-./install.sh
+./setup-build-install.sh
 ```
 
 ## Requirements
