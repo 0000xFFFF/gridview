@@ -14,7 +14,7 @@ function createWindow() {
             nodeIntegration: true,
             contextIsolation: false,
             zoomFactor: 1,
-            preload: path.resolve(path.join('src', 'preload.js'))
+            preload: path.resolve(path.join(app.getAppPath(), 'src', 'preload.js'))
         },
         icon: path.join(app.getAppPath(), 'assets', 'icon.png') // Set application icon
     });
