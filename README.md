@@ -1,4 +1,4 @@
-# gridview - masonry grid layout image viewer 
+# <img src="assets/icon.png" width="16"> gridview - masonry grid layout image viewer 
 
 <img src="preview/preview.gif" width="900" height="900">
 
