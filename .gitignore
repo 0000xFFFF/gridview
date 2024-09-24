@@ -42,5 +42,6 @@ yarn-debug.log*
 yarn-error.log*
 
 # Optional dependencies
+package.json
 package-lock.json
 yarn.lock
