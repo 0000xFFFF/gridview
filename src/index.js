@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, globalShortcut } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
+const os = require('os');
 
 let win;
 
@@ -133,6 +135,29 @@ function getMediaFiles(dirPath) {
     });
   });
 }
+
+
+function selectFile(filePath) {
+    const absolutePath = path.resolve(filePath);
+    if      (os.platform() === 'win32') { exec(`explorer /select, "${absolutePath.replace(/\//g, '\\')}"`); }
+    else if (os.platform() === 'darwin') { exec(`open -R "${absolutePath}"`); }
+    else {
+        //exec(`xdg-open "${path.dirname(absolutePath)}"`);
+        exec(`dolphin --select "${absolutePath}"`);
+    }
+}
+
+function openFile(filePath) {
+    const absolutePath = path.resolve(filePath);
+    if      (os.platform() === 'win32')  { exec(`start "" "${absolutePath.replace(/\//g, '\\')}"`); }
+    else if (os.platform() === 'darwin') { exec(`open "${absolutePath}"`); }
+    else                                 { exec(`xdg-open "${absolutePath}"`); }
+}
+
+// IPC listeners
+ipcMain.on('select-file', (event, filePath) => { selectFile(filePath); });
+ipcMain.on('open-file', (event, filePath) => { openFile(filePath); });
+
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

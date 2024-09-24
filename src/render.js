@@ -3,6 +3,9 @@ const { ipcRenderer } = require('electron');
 let setting_hoverZoom = false;
 let setting_cols = 6
 
+function selectFile(filePath) { ipcRenderer.send('select-file', filePath); }
+function openFile(filePath) { ipcRenderer.send('open-file', filePath); }
+
 function topbar_setup() {
 
     let topbar = document.getElementById('topbar');
@@ -61,8 +64,6 @@ ipcRenderer.on('selected-directory', (event, directories) => {
     div_dirs.innerHTML = ''; // Clear existing content
 
     directories.forEach(dir => {
-        let dir_path = dir.path === '.' ? '' : dir.path + '/';
-
         const div_dir = document.createElement('div');
         div_dir.className = 'media-dir';
 
@@ -81,19 +82,19 @@ ipcRenderer.on('selected-directory', (event, directories) => {
             const div_file = document.createElement('div');
             div_file.className = 'media-file';
 
-            // Info
+            // file info
             const div_file_info = document.createElement('p');
             div_file_info.className = 'media-file-info';
-
-            const div_file_info_t1 = document.createElement('p');
-            div_file_info_t1.textContent = `${file.width}x${file.height}`;
-            div_file_info.appendChild(div_file_info_t1);
-            
-            const div_file_info_t2 = document.createElement('b');
-            div_file_info_t2.textContent = `${file.name}`;
-            div_file_info.appendChild(div_file_info_t2);
-
-
+            const div_file_info_name = document.createElement('a');
+            div_file_info_name.textContent = `${file.name}`;
+            div_file_info_name.className = 'media-file-info-name';
+            div_file_info_name.addEventListener('mouseup', (event) => {
+                switch (event.button) {
+                    case 1: openFile(file.path);   break;
+                    case 2: selectFile(file.path); break;
+                }
+            });
+            div_file_info.appendChild(div_file_info_name);
             div_file.addEventListener('mouseover', function () {
                 div_file_info.style.display = 'block';
                 div_file_info.style.opacity = '1'; // Make it visible
@@ -105,6 +106,11 @@ ipcRenderer.on('selected-directory', (event, directories) => {
                 }, 300); // Match this to the duration of the CSS transition
             });
             div_file.append(div_file_info);
+
+            const div_file_info_dims = document.createElement('p');
+            div_file_info_dims.className = 'media-file-info-dims';
+            div_file_info_dims.textContent = `${file.width}x${file.height}`;
+            div_file_info.appendChild(div_file_info_dims);
 
             // Image or video
             if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif')) {

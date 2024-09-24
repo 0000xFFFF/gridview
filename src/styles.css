@@ -52,7 +52,16 @@ h1 {
     transition: opacity 0.3s ease;
 }
 
-.media-file-info p, .media-file-info b {
+.media-file-info-name {
+    font-size: large;
+    margin: 0;
+    padding: 0;
+    text-decoration: underline;
+    color: lightblue;
+}
+
+.media-file-info-dims {
+    font-size: smaller;
     margin: 0;
     padding: 0;
 }
