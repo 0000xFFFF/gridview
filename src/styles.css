@@ -53,6 +53,7 @@ h1 {
 }
 
 .media-file-info-name {
+    cursor: pointer;
     font-size: large;
     margin: 0;
     padding: 0;
@@ -163,6 +164,24 @@ h1 {
 	margin: 0;
 	padding: 0;
 }
+
+input[type='range']::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 15px;
+	height: 15px;
+	border: 1px solid rgba(239, 191, 113, 1);
+	border-radius: 50%;
+	color: var(--main-color-orange);
+	background: var(--main-color-orange);
+	cursor: pointer;
+	margin: 0;
+	padding: 0;
+    --plyr-range-thumb-background: var(--main-color-orange);
+    -webkit-appearance: none;
+    background: var(--plyr-range-thumb-background);
+}
+
 .sliderLabel {
 	display: inline;
 	padding: 0;
