@@ -95,26 +95,32 @@ async function getMediaDirectories(dirPath) {
                 });
             }
 
-            // Check subdirectories
-            for (const file of files) {
-                const fullPath = path.join(dirPath, file.name);
-
-                if (file.isDirectory()) {
-                    const subMediaFiles = await getMediaFiles(fullPath); // Get media files in the subdirectory
-                    if (subMediaFiles.length > 0) { // Only add if not empty
-                        directories.push({
-                            path: file.name,
-                            files: subMediaFiles
-                        });
-                    }
-                }
-            }
+            // Check subdirectories recursively
+            await processDirectories(files, dirPath, dirPath, directories);
 
             resolve(directories);
         });
     });
 }
 
+async function processDirectories(files, basePath, currentPath, directories) {
+    for (const file of files) {
+        const fullPath = path.join(currentPath, file.name);
+
+        if (file.isDirectory()) {
+            const subMediaFiles = await getMediaFiles(fullPath); // Get media files in the subdirectory
+            if (subMediaFiles.length > 0) { // Only add if not empty
+                directories.push({
+                    path: fullPath.replace(`${basePath}/`, ''), // Use relative path
+                    files: subMediaFiles
+                });
+            }
+            // Recursively process subdirectories
+            const subFiles = await fs.promises.readdir(fullPath, { withFileTypes: true });
+            await processDirectories(subFiles, basePath, fullPath, directories); // Process subdirectory files
+        }
+    }
+}
 
 function getMediaFiles(dirPath) {
     return new Promise((resolve, reject) => {
