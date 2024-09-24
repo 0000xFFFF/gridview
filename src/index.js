@@ -51,9 +51,7 @@ function createWindow() {
   Menu.setApplicationMenu(menu);
 
   // Register the shortcut for opening Developer Tools
-  globalShortcut.register('Control+Shift+I', () => {
-    win.webContents.openDevTools();
-  });
+  globalShortcut.register('Control+Shift+I', () => { win.webContents.openDevTools(); });
 }
 
 app.whenReady().then(createWindow);
@@ -64,7 +62,8 @@ async function selectDirectory() {
   if (result.canceled) { return null; } // No directory was chosen
 
   const dirPath = result.filePaths[0];
-  console.log(`selected dir: ${dirPath}`)
+  console.log(`selected dir: ${dirPath}`);
+  win.setTitle(`GridView - ${dirPath}`);
   return getMediaDirectories(dirPath); // Return media files from the selected directory
 }
 
