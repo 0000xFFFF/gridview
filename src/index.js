@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, globalShortcut, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
@@ -125,8 +125,6 @@ function getMediaFiles(dirPath) {
           mediaFiles.push({
             name: file,
             path: fullPath,  // Full path to the file
-            width: 1920,     // Placeholder width
-            height: 1080     // Placeholder height
           });
         }
       });

@@ -107,16 +107,19 @@ ipcRenderer.on('selected-directory', (event, directories) => {
             });
             div_file.append(div_file_info);
 
-            const div_file_info_dims = document.createElement('p');
-            div_file_info_dims.className = 'media-file-info-dims';
-            div_file_info_dims.textContent = `${file.width}x${file.height}`;
-            div_file_info.appendChild(div_file_info_dims);
 
             // Image or video
             if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif')) {
                 const img = document.createElement('img');
                 img.src = `file://${file.path}`
                 div_file.appendChild(img);
+
+                img.addEventListener('load', () => {
+                    const div_file_info_dims = document.createElement('p');
+                    div_file_info_dims.className = 'media-file-info-dims';
+                    div_file_info_dims.textContent = `${img.naturalWidth}x${img.naturalHeight}`;
+                    div_file_info.appendChild(div_file_info_dims);
+                });
 
                 // image popup on hover
                 div_file.addEventListener('mouseenter', function () {
