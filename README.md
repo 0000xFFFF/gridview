@@ -1,5 +1,7 @@
 # gridview - masonry grid layout image viewer 
 
+<img src="preview/preview.gif" width="900" height="900">
+
 # Installation
 ```
 ./setup-build-install.sh
