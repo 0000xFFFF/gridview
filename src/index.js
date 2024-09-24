@@ -5,6 +5,8 @@ const path = require('path');
 let win;
 
 function createWindow() {
+  console.log(path.join(app.getAppPath(), 'assets', 'icon.ico'));
+
   win = new BrowserWindow({
     width: 800,
     height: 600,
@@ -12,7 +14,7 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false // Ensure this is set to false for IPC to work
     },
-    icon: path.join(app.getAppPath(), 'assets', 'icon.ico') // Set application icon
+    icon: path.join(app.getAppPath(), 'assets', 'icon.png') // Set application icon
   });
 
   const startUrl = path.join(app.getAppPath(), 'src', 'index.html');
