@@ -112,6 +112,7 @@ ipcRenderer.on('selected-directory', (event, directories) => {
             if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif')) {
                 const img = document.createElement('img');
                 img.src = `file://${file.path}`
+                //img.loading = 'lazy';
                 div_file.appendChild(img);
 
                 img.addEventListener('load', () => {
