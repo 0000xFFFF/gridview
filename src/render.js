@@ -12,7 +12,7 @@ function addFileInfo(div_file, file) {
         switch (event.button) {
             case 1: ipcRenderer.send('open-file', file.path); break;
             case 2: ipcRenderer.send('select-file', file.path); break;
-            img_popup.style.display = 'block';
+                img_popup.style.display = 'block';
         }
     });
     div_file_info.appendChild(div_file_info_name);
@@ -33,34 +33,44 @@ function addFileInfo(div_file, file) {
 
 
 function addChildImage(div_file, file, div_file_info) {
-    return new Promise((resolve, reject) => {
-        const img = document.createElement('img');
-        img.src = `file://${file.path}`;
+    const img = document.createElement('img');
+    img.loading = 'lazy'; // Just in case the browser supports native lazy loading
+    img.dataset.src = `file://${file.path}`; // Store the src in a data attribute
 
-        img.onload = () => {
-            const div_file_info_dims = document.createElement('p');
-            div_file_info_dims.className = 'media-file-info-dims';
-            div_file_info_dims.textContent = `${img.naturalWidth}x${img.naturalHeight}`;
-            div_file_info.appendChild(div_file_info_dims);
-            resolve(); // Resolve the promise once the image is loaded
-        };
+    const div_file_info_dims = document.createElement('p');
+    div_file_info_dims.className = 'media-file-info-dims';
 
-        img.onerror = reject; // Reject the promise if image fails to load
+    // Image popup on hover
+    div_file.addEventListener('mouseenter', function () {
+        if (!setting_hoverZoom) { return; }
+        img_popup.src = img.src;
+        img_popup.style.display = 'block';
+    });
+    div_file.addEventListener('mouseleave', function () {
+        img_popup.src = '';
+        img_popup.style.display = 'none';
+    });
 
-        div_file.appendChild(img);
-
-        // Image popup on hover
-        div_file.addEventListener('mouseenter', function () {
-            if (!setting_hoverZoom) { return; }
-            img_popup.src = img.src;
-            img_popup.style.display = 'block';
-        });
-        div_file.addEventListener('mouseleave', function () {
-            img_popup.src = '';
-            img_popup.style.display = 'none';
+    // Observer logic
+    const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                img.src = img.dataset.src; // Load the image
+                img.onload = () => {
+                    div_file_info_dims.textContent = `${img.naturalWidth}x${img.naturalHeight}`;
+                    div_file_info.appendChild(div_file_info_dims);
+                };
+                observer.unobserve(img); // Stop observing once the image is loaded
+            }
         });
     });
+
+    observer.observe(img); // Observe the image element
+    div_file.appendChild(img);
+
+    return Promise.resolve(); // No need to wait for the image to load
 }
+
 
 function addChildVideo(div_file, file, div_file_info) {
     return new Promise((resolve) => {
