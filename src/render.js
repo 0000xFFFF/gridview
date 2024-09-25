@@ -129,6 +129,7 @@ window.electronAPI.onSelectedDirectory(async (event, directories) => {
 
         const div_dir_files = document.createElement('div');
         div_dir_files.className = 'media-dir-files';
+        div_dir_files.style.columnCount = setting_cols;
 
         for (const file of dir.files) {
             // Create the file element and append it immediately
