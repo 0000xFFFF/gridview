@@ -4,10 +4,11 @@ const path = require('path');
 const { exec } = require('child_process');
 const os = require('os');
 
-let win;
+let mainWindow;
 
-function createWindow() {
-    win = new BrowserWindow({
+app.whenReady().then(() => {
+    // WINDOW SETTINGS
+    mainWindow = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
@@ -19,9 +20,11 @@ function createWindow() {
         icon: path.join(app.getAppPath(), 'assets', 'icon.png') // Set application icon
     });
 
+    // LOAD INDEX
     const startUrl = path.join(app.getAppPath(), 'src', 'index.html');
-    win.loadFile(startUrl);
+    mainWindow.loadFile(startUrl);
 
+    // MENU SETUP
     const menu = Menu.buildFromTemplate([
         {
             label: 'File',
@@ -34,7 +37,7 @@ function createWindow() {
                 {
                     label: 'Show Dev Tools',
                     click: () => {
-                        win.webContents.openDevTools(); // Opens the DevTools for the current window
+                        mainWindow.webContents.openDevTools(); // Opens the DevTools for the current window
                     }
                 },
                 { type: 'separator' },
@@ -45,26 +48,21 @@ function createWindow() {
             ]
         }
     ]);
-
-
     Menu.setApplicationMenu(menu);
 
-    // Register the shortcut for opening Developer Tools
-    globalShortcut.register('Control+Shift+I', () => { win.webContents.openDevTools(); });
-}
-
-app.whenReady().then(createWindow);
+    globalShortcut.register('Control+Shift+I', () => { mainWindow.webContents.openDevTools(); });
+});
 
 
 async function selectDirectoryAndSend() {
     const selectedDir = await selectDirectory();
     if (selectedDir) {
-        win.webContents.send('selected-directory', selectedDir);  // Send selected directory to renderer
+        mainWindow.webContents.send('selected-directory', selectedDir);  // Send selected directory to renderer
     }
 }
 
 async function selectDirectory() {
-    const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
+    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
     if (result.canceled) { return null; } // No directory was chosen
 
     const dirPath = result.filePaths[0];
@@ -74,7 +72,7 @@ async function selectDirectory() {
 
 async function loadDir(dirPath) {
     //console.log(`selected dir: ${dirPath}`);
-    win.setTitle(`GridView - ${dirPath}`);
+    mainWindow.setTitle(`GridView - ${dirPath}`);
     return await getMediaDirectories(dirPath);
 }
 
@@ -172,7 +170,7 @@ ipcMain.on('select-file', (event, filePath) => { selectFile(filePath); });
 ipcMain.on('open-file', (event, filePath) => { openFile(filePath); });
 ipcMain.on('drop-folder', async (event, dirPath) => {
     const directories = await loadDir(dirPath);
-    win.webContents.send('selected-directory', directories);
+    mainWindow.webContents.send('selected-directory', directories);
 });
 
 app.on('window-all-closed', () => {

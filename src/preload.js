@@ -1,5 +1,5 @@
 // preload.js
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('fs', fs);
 contextBridge.exposeInMainWorld('path', path);
 contextBridge.exposeInMainWorld('electronAPI', {
     onSelectedDirectory: (callback) => ipcRenderer.on('selected-directory', callback),
+    setZoomFactor: (factor) => webFrame.setZoomFactor(factor)
 })
 
 process.once('loaded', () => {

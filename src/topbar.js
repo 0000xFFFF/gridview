@@ -33,6 +33,24 @@ slider.addEventListener('wheel', function (event) {
 });
 slider_update();
 
+let currentZoomFactor = 1.0; // Initial zoom level
+
+window.addEventListener('wheel', (event) => {
+    if (event.ctrlKey && event.shiftKey) {
+        currentZoomFactor = 1;
+        window.electronAPI.setZoomFactor(currentZoomFactor);
+        return;
+    }
+
+    if (event.ctrlKey) {
+        event.preventDefault(); // Prevent the page from scrolling
+        if      (event.deltaY < 0) { currentZoomFactor += 0.1; }
+        else if (event.deltaY > 0) { currentZoomFactor = Math.max(0.1, currentZoomFactor - 0.1); }
+        window.electronAPI.setZoomFactor(currentZoomFactor);
+        return;
+    }
+});
+
 // setting up keyboard events for topbar
 document.addEventListener('keydown', (event) => {
     switch (event.key) {
@@ -41,3 +59,5 @@ document.addEventListener('keydown', (event) => {
         case 'ArrowRight': slider_right(); break;
     }
 });
+
+
