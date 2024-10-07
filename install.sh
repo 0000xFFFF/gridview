@@ -11,8 +11,9 @@ full_icon_path="$(realpath "$relative_icon_path")"
 # Create the symbolic link to the application
 sudo ln -sfr release-builds/gridview-linux-x64/gridview /usr/local/bin/gridview
 
+mkdir -p ~/.local/share/applications
 # Generate the gridview.desktop file
-cat << EOF > /home/user/.local/share/applications/gridview.desktop
+cat << EOF > ~/.local/share/applications/gridview.desktop
 [Desktop Entry]
 Version=1.0
 Name=GridView
