@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const os = require('os');
+const sizeOf = require('image-size').default || require('image-size');
 
 let mainWindow;
 
@@ -120,31 +121,53 @@ async function processDirectories(files, basePath, currentPath, directories) {
     }
 }
 
-function getMediaFiles(dirPath) {
+async function dims(imagePath) {
     return new Promise((resolve, reject) => {
-        const mediaExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.webm', '.mov', '.avi'];
-        const mediaFiles = [];
+        fs.readFile(imagePath, (err, buffer) => {
+            if (err) {
+                console.error('Error reading file:', err);
+                resolve({ width: null, height: null }); // Resolve with nulls to avoid breaking
+                return;
+            }
 
-        fs.readdir(dirPath, (err, files) => {
-            if (err) return reject(err);
-
-            files.forEach(file => {
-                const fullPath = path.join(dirPath, file);
-                const extname = path.extname(file).toLowerCase();
-
-                // Check if the file has a media extension
-                if (mediaExtensions.includes(extname)) {
-                    //console.log(fullPath);
-                    mediaFiles.push({
-                        name: file,
-                        path: fullPath,  // Full path to the file
-                    });
-                }
-            });
-
-            resolve(mediaFiles); // Resolve the promise with media files
+            try {
+                const dimensions = sizeOf(buffer);
+                resolve(dimensions);
+            } catch (error) {
+                console.error('Error getting dimensions:', error);
+                resolve({ width: null, height: null });
+            }
         });
     });
+}
+
+async function getMediaFiles(dirPath) {
+    const mediaExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.webm', '.mov', '.avi'];
+    const mediaFiles = [];
+
+    try {
+        const files = await fs.promises.readdir(dirPath); // Await the file reading
+
+        for (const file of files) {
+            const fullPath = path.join(dirPath, file);
+            const extname = path.extname(file).toLowerCase();
+
+            if (mediaExtensions.includes(extname)) {
+                const d = await dims(fullPath); // Await the image dimensions
+
+                mediaFiles.push({
+                    name: file,
+                    width: d.width,
+                    height: d.height,
+                    path: fullPath,
+                });
+            }
+        }
+    } catch (err) {
+        console.error('Error reading directory:', err);
+    }
+
+    return mediaFiles;
 }
 
 

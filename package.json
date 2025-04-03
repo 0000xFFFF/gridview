@@ -22,5 +22,8 @@
     "electron": "^26.6.10"
   },
   "keywords": [],
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "image-size": "^2.0.2"
+  }
 }

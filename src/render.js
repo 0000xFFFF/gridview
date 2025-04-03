@@ -12,15 +12,14 @@ function addFileInfo(div_file, file) {
         switch (event.button) {
             case 1: ipcRenderer.send('open-file', file.path); break;
             case 2: ipcRenderer.send('select-file', file.path); break;
-                img_popup.style.display = 'block';
         }
     });
     div_file_info.appendChild(div_file_info_name);
-    div_file.addEventListener('mouseover', function () {
+    div_file.addEventListener('mouseover', function() {
         div_file_info.style.display = 'block';
         div_file_info.style.opacity = '1'; // Make it visible
     });
-    div_file.addEventListener('mouseleave', function () {
+    div_file.addEventListener('mouseleave', function() {
         div_file_info.style.opacity = '0'; // Hide with transition
         setTimeout(() => {
             div_file_info.style.display = 'none'; // Hide after transition
@@ -34,6 +33,8 @@ function addFileInfo(div_file, file) {
 
 function addChildImage(div_file, file, div_file_info) {
     const img = document.createElement('img');
+    img.width = file.width;
+    img.height = file.height;
     img.loading = 'lazy'; // Just in case the browser supports native lazy loading
     img.dataset.src = `file://${file.path}`; // Store the src in a data attribute
 
@@ -41,12 +42,12 @@ function addChildImage(div_file, file, div_file_info) {
     div_file_info_dims.className = 'media-file-info-dims';
 
     // Image popup on hover
-    div_file.addEventListener('mouseenter', function () {
+    div_file.addEventListener('mouseenter', function() {
         if (!setting_hoverZoom) { return; }
         img_popup.src = img.src;
         img_popup.style.display = 'block';
     });
-    div_file.addEventListener('mouseleave', function () {
+    div_file.addEventListener('mouseleave', function() {
         img_popup.src = '';
         img_popup.style.display = 'none';
     });
