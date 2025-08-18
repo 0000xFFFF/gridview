@@ -75,17 +75,37 @@ function addChildImage(div_file, file, div_file_info) {
 
 function addChildVideo(div_file, file, div_file_info) {
     return new Promise((resolve) => {
-        const video = document.createElement('video');
-        video.autoplay = true;
-        video.muted = true;
-        video.loop = true;
-        video.controls = false;
-        video.src = `file://${file.path}`;
-        video.addEventListener('click', () => { video.muted = !video.muted; });
-        div_file.appendChild(video);
-        resolve(); // Immediately resolve since no loading is required for video thumbnails
+        // Make container relative for overlay
+        div_file.style.position = 'relative';
+
+        // Thumbnail image
+        const thumbImg = document.createElement('img');
+        thumbImg.src = `file://${file.thumb || file.path}`;
+        thumbImg.className = 'video-thumb';
+        div_file.appendChild(thumbImg);
+
+        // Play button overlay
+        const playBtn = document.createElement('div');
+        playBtn.className = 'play-button';
+        playBtn.innerHTML = '&#9658;'; // Triangle play symbol
+        div_file.appendChild(playBtn);
+
+        // On click, replace thumbnail with actual video
+        thumbImg.addEventListener('click', () => {
+            const video = document.createElement('video');
+            video.src = `file://${file.path}`;
+            video.controls = true;
+            video.autoplay = false;
+            video.loop = false;
+            video.muted = true;
+            div_file.innerHTML = ''; // Clear thumbnail + button
+            div_file.appendChild(video);
+        });
+
+        resolve();
     });
 }
+
 
 function createFile(file) {
     const div_file = document.createElement('div');

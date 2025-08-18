@@ -4,7 +4,7 @@ const path = require('path');
 const { exec } = require('child_process');
 const os = require('os');
 const sizeOf = require('image-size').default || require('image-size');
-
+const thumbDir = path.join(app.getPath('userData'), 'thumbs');
 let mainWindow;
 
 app.whenReady().then(() => {
@@ -54,6 +54,34 @@ app.whenReady().then(() => {
     globalShortcut.register('Control+Shift+I', () => { mainWindow.webContents.openDevTools(); });
 });
 
+fs.mkdirSync(thumbDir, { recursive: true });
+
+async function generateVideoThumbnail(videoPath) {
+    return new Promise((resolve, reject) => {
+        const thumbPath = path.join(
+            thumbDir,
+            path.basename(videoPath) + '.jpg'
+        );
+
+        // Skip if thumbnail already exists
+        if (fs.existsSync(thumbPath)) {
+            return resolve(thumbPath);
+        }
+
+        // Generate thumbnail with ffmpeg
+        const cmd = `ffmpeg -i "${videoPath}" -ss 00:00:01 -vframes 1 -vf scale=160:-1 -q:v 31 "${thumbPath}" -y`;
+
+
+        exec(cmd, (err) => {
+            if (err) {
+                console.error('Thumbnail generation failed:', err);
+                resolve(null);
+            } else {
+                resolve(thumbPath);
+            }
+        });
+    });
+}
 
 async function selectDirectoryAndSend() {
     const selectedDir = await selectDirectory();
@@ -142,24 +170,38 @@ async function dims(imagePath) {
 }
 
 async function getMediaFiles(dirPath) {
-    const mediaExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.webm', '.mov', '.avi'];
+
+    mainWindow.setTitle(`GridView - loading ${dirPath}`);
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif'];
+    const videoExtensions = ['.mp4', '.webm', '.mov', '.avi'];
     const mediaFiles = [];
 
     try {
-        const files = await fs.promises.readdir(dirPath); // Await the file reading
+        const files = await fs.promises.readdir(dirPath);
 
         for (const file of files) {
             const fullPath = path.join(dirPath, file);
             const extname = path.extname(file).toLowerCase();
 
-            if (mediaExtensions.includes(extname)) {
-                const d = await dims(fullPath); // Await the image dimensions
-
+            if (imageExtensions.includes(extname)) {
+                const d = await dims(fullPath);
                 mediaFiles.push({
                     name: file,
                     width: d.width,
                     height: d.height,
                     path: fullPath,
+                    type: 'image'
+                });
+            }
+            else if (videoExtensions.includes(extname)) {
+                const thumb = await generateVideoThumbnail(fullPath);
+                mediaFiles.push({
+                    name: file,
+                    path: fullPath,
+                    type: 'video',
+                    thumb: thumb,  // send the thumbnail path
+                    width: null,
+                    height: null
                 });
             }
         }
@@ -167,13 +209,13 @@ async function getMediaFiles(dirPath) {
         console.error('Error reading directory:', err);
     }
 
+    mainWindow.setTitle(`GridView - loaded ${dirPath}`);
     return mediaFiles;
 }
 
-
 function selectFile(filePath) {
     const absolutePath = path.resolve(filePath);
-    if      (os.platform() === 'win32') { exec(`explorer /select, "${absolutePath.replace(/\//g, '\\')}"`); }
+    if (os.platform() === 'win32') { exec(`explorer /select, "${absolutePath.replace(/\//g, '\\')}"`); }
     else if (os.platform() === 'darwin') { exec(`open -R "${absolutePath}"`); }
     else {
         //exec(`xdg-open "${path.dirname(absolutePath)}"`);
@@ -183,9 +225,9 @@ function selectFile(filePath) {
 
 function openFile(filePath) {
     const absolutePath = path.resolve(filePath);
-    if      (os.platform() === 'win32')  { exec(`start "" "${absolutePath.replace(/\//g, '\\')}"`); }
+    if (os.platform() === 'win32') { exec(`start "" "${absolutePath.replace(/\//g, '\\')}"`); }
     else if (os.platform() === 'darwin') { exec(`open "${absolutePath}"`); }
-    else                                 { exec(`xdg-open "${absolutePath}"`); }
+    else { exec(`xdg-open "${absolutePath}"`); }
 }
 
 // IPC listeners
