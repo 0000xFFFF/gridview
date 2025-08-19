@@ -3,7 +3,7 @@ img_popup.className = 'media-file-popup';
 document.body.appendChild(img_popup);
 
 function addFileInfo(div_file, file) {
-    const div_file_info = document.createElement('p');
+    const div_file_info = document.createElement('span');
     div_file_info.className = 'media-file-info';
     const div_file_info_name = document.createElement('a');
     div_file_info_name.textContent = file.name;
@@ -38,7 +38,7 @@ function addChildImage(div_file, file, div_file_info) {
     img.loading = 'lazy'; // Just in case the browser supports native lazy loading
     img.dataset.src = `file://${file.path}`; // Store the src in a data attribute
 
-    const div_file_info_dims = document.createElement('p');
+    const div_file_info_dims = document.createElement('span');
     div_file_info_dims.className = 'media-file-info-dims';
 
     // Image popup on hover
