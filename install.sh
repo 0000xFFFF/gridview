@@ -1,4 +1,6 @@
-#!/bin/bash -x
+#!/usr/bin/env bash
+set -x
+
 npm install
 npm run pack
 
