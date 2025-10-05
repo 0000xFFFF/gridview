@@ -1,28 +1,32 @@
-const img_popup = document.createElement('img');
-img_popup.className = 'media-file-popup';
+const img_popup = document.createElement("img");
+img_popup.className = "media-file-popup";
 document.body.appendChild(img_popup);
 
 function addFileInfo(div_file, file) {
-    const div_file_info = document.createElement('span');
-    div_file_info.className = 'media-file-info';
-    const div_file_info_name = document.createElement('a');
+    const div_file_info = document.createElement("span");
+    div_file_info.className = "media-file-info";
+    const div_file_info_name = document.createElement("a");
     div_file_info_name.textContent = file.name;
-    div_file_info_name.className = 'media-file-info-name';
-    div_file_info_name.addEventListener('mouseup', (event) => {
+    div_file_info_name.className = "media-file-info-name";
+    div_file_info_name.addEventListener("mouseup", (event) => {
         switch (event.button) {
-            case 1: ipcRenderer.send('open-file', file.path); break;
-            case 2: ipcRenderer.send('select-file', file.path); break;
+            case 1:
+                ipcRenderer.send("open-file", file.path);
+                break;
+            case 2:
+                ipcRenderer.send("select-file", file.path);
+                break;
         }
     });
     div_file_info.appendChild(div_file_info_name);
-    div_file.addEventListener('mouseover', function() {
-        div_file_info.style.display = 'block';
-        div_file_info.style.opacity = '1'; // Make it visible
+    div_file.addEventListener("mouseover", function () {
+        div_file_info.style.display = "block";
+        div_file_info.style.opacity = "1"; // Make it visible
     });
-    div_file.addEventListener('mouseleave', function() {
-        div_file_info.style.opacity = '0'; // Hide with transition
+    div_file.addEventListener("mouseleave", function () {
+        div_file_info.style.opacity = "0"; // Hide with transition
         setTimeout(() => {
-            div_file_info.style.display = 'none'; // Hide after transition
+            div_file_info.style.display = "none"; // Hide after transition
         }, 300); // Match this to the duration of the CSS transition
     });
 
@@ -30,31 +34,32 @@ function addFileInfo(div_file, file) {
     return div_file_info;
 }
 
-
 function addChildImage(div_file, file, div_file_info) {
-    const img = document.createElement('img');
+    const img = document.createElement("img");
     img.width = file.width;
     img.height = file.height;
-    img.loading = 'lazy'; // Just in case the browser supports native lazy loading
+    img.loading = "lazy"; // Just in case the browser supports native lazy loading
     img.dataset.src = `file://${file.path}`; // Store the src in a data attribute
 
-    const div_file_info_dims = document.createElement('span');
-    div_file_info_dims.className = 'media-file-info-dims';
+    const div_file_info_dims = document.createElement("span");
+    div_file_info_dims.className = "media-file-info-dims";
 
     // Image popup on hover
-    div_file.addEventListener('mouseenter', function() {
-        if (!setting_hoverZoom) { return; }
+    div_file.addEventListener("mouseenter", function () {
+        if (!setting_hoverZoom) {
+            return;
+        }
         img_popup.src = img.src;
-        img_popup.style.display = 'block';
+        img_popup.style.display = "block";
     });
-    div_file.addEventListener('mouseleave', function() {
-        img_popup.src = '';
-        img_popup.style.display = 'none';
+    div_file.addEventListener("mouseleave", function () {
+        img_popup.src = "";
+        img_popup.style.display = "none";
     });
 
     // Observer logic
     const observer = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
+        entries.forEach((entry) => {
             if (entry.isIntersecting) {
                 img.src = img.dataset.src; // Load the image
                 img.onload = () => {
@@ -72,33 +77,32 @@ function addChildImage(div_file, file, div_file_info) {
     return Promise.resolve(); // No need to wait for the image to load
 }
 
-
 function addChildVideo(div_file, file, div_file_info) {
     return new Promise((resolve) => {
         // Make container relative for overlay
-        div_file.style.position = 'relative';
+        div_file.style.position = "relative";
 
         // Thumbnail image
-        const thumbImg = document.createElement('img');
+        const thumbImg = document.createElement("img");
         thumbImg.src = `file://${file.thumb || file.path}`;
-        thumbImg.className = 'video-thumb';
+        thumbImg.className = "video-thumb";
         div_file.appendChild(thumbImg);
 
         // Play button overlay
-        const playBtn = document.createElement('div');
-        playBtn.className = 'play-button';
-        playBtn.innerHTML = '&#9658;'; // Triangle play symbol
+        const playBtn = document.createElement("div");
+        playBtn.className = "play-button";
+        playBtn.innerHTML = "&#9658;"; // Triangle play symbol
         div_file.appendChild(playBtn);
 
         // On click, replace thumbnail with actual video
-        thumbImg.addEventListener('click', () => {
-            const video = document.createElement('video');
+        thumbImg.addEventListener("click", () => {
+            const video = document.createElement("video");
             video.src = `file://${file.path}`;
             video.controls = true;
             video.autoplay = false;
             video.loop = false;
             video.muted = true;
-            div_file.innerHTML = ''; // Clear thumbnail + button
+            div_file.innerHTML = ""; // Clear thumbnail + button
             div_file.appendChild(video);
         });
 
@@ -106,50 +110,63 @@ function addChildVideo(div_file, file, div_file_info) {
     });
 }
 
-
 function createFile(file) {
-    const div_file = document.createElement('div');
-    div_file.className = 'media-file';
+    const div_file = document.createElement("div");
+    div_file.className = "media-file";
 
     // File info
     let div_file_info = addFileInfo(div_file, file);
 
     // Image or video
-    if (file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || file.name.endsWith('.gif')) {
-        return addChildImage(div_file, file, div_file_info).then(() => div_file); // Return a promise that resolves to the div_file
-    } else if (file.name.endsWith('.mp4') || file.name.endsWith('.webm') || file.name.endsWith('.mov') || file.name.endsWith('.avi')) {
-        return addChildVideo(div_file, file, div_file_info).then(() => div_file); // Return a promise that resolves to the div_file
+    if (
+        file.name.endsWith(".png") ||
+        file.name.endsWith(".jpg") ||
+        file.name.endsWith(".jpeg") ||
+        file.name.endsWith(".gif")
+    ) {
+        return addChildImage(div_file, file, div_file_info).then(
+            () => div_file
+        ); // Return a promise that resolves to the div_file
+    } else if (
+        file.name.endsWith(".mp4") ||
+        file.name.endsWith(".webm") ||
+        file.name.endsWith(".mov") ||
+        file.name.endsWith(".avi")
+    ) {
+        return addChildVideo(div_file, file, div_file_info).then(
+            () => div_file
+        ); // Return a promise that resolves to the div_file
     }
     return Promise.resolve(div_file); // Return the div_file if no async media loading is required
 }
 
 window.electronAPI.onSelectedDirectory(async (event, directories) => {
-    const div_dirs = document.getElementById('media-dirs');
-    div_dirs.innerHTML = ''; // Clear existing content
+    const div_dirs = document.getElementById("media-dirs");
+    div_dirs.innerHTML = ""; // Clear existing content
 
-    const topbar = document.getElementById('topbar');
+    const topbar = document.getElementById("topbar");
 
     // Show loading GIF in topbar
-    const loadingGif = document.createElement('img');
-    loadingGif.src = '../assets/load.gif'; // Replace with the actual path to your GIF
-    loadingGif.className = 'loading-gif'; // Optional: Add a class for styling
+    const loadingGif = document.createElement("img");
+    loadingGif.src = "../assets/load.gif"; // Replace with the actual path to your GIF
+    loadingGif.className = "loading-gif"; // Optional: Add a class for styling
     topbar.appendChild(loadingGif); // Add the loading GIF to the topbar
 
     const loadPromises = []; // Array to store image/video loading promises
 
     for (const dir of directories) {
-        const div_dir = document.createElement('div');
-        div_dir.className = 'media-dir';
+        const div_dir = document.createElement("div");
+        div_dir.className = "media-dir";
 
-        const div_dir_head = document.createElement('div');
-        div_dir_head.className = 'media-dir-head';
-        const h1 = document.createElement('h1');
+        const div_dir_head = document.createElement("div");
+        div_dir_head.className = "media-dir-head";
+        const h1 = document.createElement("h1");
         h1.textContent = dir.path;
         div_dir_head.appendChild(h1);
         div_dir.appendChild(div_dir_head);
 
-        const div_dir_files = document.createElement('div');
-        div_dir_files.className = 'media-dir-files';
+        const div_dir_files = document.createElement("div");
+        div_dir_files.className = "media-dir-files";
         div_dir_files.style.columnCount = setting_cols;
 
         for (const file of dir.files) {
@@ -168,10 +185,9 @@ window.electronAPI.onSelectedDirectory(async (event, directories) => {
     try {
         await Promise.all(loadPromises);
     } catch (err) {
-        console.error('Error loading some files:', err);
+        console.error("Error loading some files:", err);
     }
 
     // Remove the loading GIF after all images/videos have loaded
     topbar.removeChild(loadingGif);
 });
-

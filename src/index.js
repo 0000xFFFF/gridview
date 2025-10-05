@@ -1,10 +1,18 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, globalShortcut, nativeImage } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const { exec } = require('child_process');
-const os = require('os');
-const sizeOf = require('image-size').default || require('image-size');
-const thumbDir = path.join(app.getPath('userData'), 'thumbs');
+const {
+    app,
+    BrowserWindow,
+    ipcMain,
+    dialog,
+    Menu,
+    globalShortcut,
+    nativeImage,
+} = require("electron");
+const fs = require("fs");
+const path = require("path");
+const { exec } = require("child_process");
+const os = require("os");
+const sizeOf = require("image-size").default || require("image-size");
+const thumbDir = path.join(app.getPath("userData"), "thumbs");
 let mainWindow;
 
 app.whenReady().then(() => {
@@ -16,42 +24,46 @@ app.whenReady().then(() => {
             nodeIntegration: true,
             audio: true,
             zoomFactor: 1,
-            preload: path.resolve(path.join(app.getAppPath(), 'src', 'preload.js'))
+            preload: path.resolve(
+                path.join(app.getAppPath(), "src", "preload.js")
+            ),
         },
-        icon: path.join(app.getAppPath(), 'assets', 'icon.png') // Set application icon
+        icon: path.join(app.getAppPath(), "assets", "icon.png"), // Set application icon
     });
 
     // LOAD INDEX
-    const startUrl = path.join(app.getAppPath(), 'src', 'index.html');
+    const startUrl = path.join(app.getAppPath(), "src", "index.html");
     mainWindow.loadFile(startUrl);
 
     // MENU SETUP
     const menu = Menu.buildFromTemplate([
         {
-            label: 'File',
+            label: "File",
             submenu: [
                 {
-                    label: 'Select Directory',
-                    click: selectDirectoryAndSend
+                    label: "Select Directory",
+                    click: selectDirectoryAndSend,
                 },
-                { type: 'separator' },
+                { type: "separator" },
                 {
-                    label: 'Show Dev Tools',
+                    label: "Show Dev Tools",
                     click: () => {
                         mainWindow.webContents.openDevTools(); // Opens the DevTools for the current window
-                    }
+                    },
                 },
-                { type: 'separator' },
+                { type: "separator" },
                 {
-                    label: 'Quit',
-                    role: 'quit'
-                }
-            ]
-        }
+                    label: "Quit",
+                    role: "quit",
+                },
+            ],
+        },
     ]);
     Menu.setApplicationMenu(menu);
 
-    globalShortcut.register('Control+Shift+I', () => { mainWindow.webContents.openDevTools(); });
+    globalShortcut.register("Control+Shift+I", () => {
+        mainWindow.webContents.openDevTools();
+    });
 });
 
 fs.mkdirSync(thumbDir, { recursive: true });
@@ -60,7 +72,7 @@ async function generateVideoThumbnail(videoPath) {
     return new Promise((resolve, reject) => {
         const thumbPath = path.join(
             thumbDir,
-            path.basename(videoPath) + '.jpg'
+            path.basename(videoPath) + ".jpg"
         );
 
         // Skip if thumbnail already exists
@@ -71,10 +83,9 @@ async function generateVideoThumbnail(videoPath) {
         // Generate thumbnail with ffmpeg
         const cmd = `ffmpeg -i "${videoPath}" -ss 00:00:01 -vframes 1 -vf scale=160:-1 -q:v 31 "${thumbPath}" -y`;
 
-
         exec(cmd, (err) => {
             if (err) {
-                console.error('Thumbnail generation failed:', err);
+                console.error("Thumbnail generation failed:", err);
                 resolve(null);
             } else {
                 resolve(thumbPath);
@@ -86,18 +97,21 @@ async function generateVideoThumbnail(videoPath) {
 async function selectDirectoryAndSend() {
     const selectedDir = await selectDirectory();
     if (selectedDir) {
-        mainWindow.webContents.send('selected-directory', selectedDir);  // Send selected directory to renderer
+        mainWindow.webContents.send("selected-directory", selectedDir); // Send selected directory to renderer
     }
 }
 
 async function selectDirectory() {
-    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
-    if (result.canceled) { return null; } // No directory was chosen
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ["openDirectory"],
+    });
+    if (result.canceled) {
+        return null;
+    } // No directory was chosen
 
     const dirPath = result.filePaths[0];
     return await loadDir(dirPath);
 }
-
 
 async function loadDir(dirPath) {
     //console.log(`selected dir: ${dirPath}`);
@@ -117,8 +131,8 @@ async function getMediaDirectories(dirPath) {
             // Only add the root directory if it has media files
             if (mediaFiles.length > 0) {
                 directories.push({
-                    path: '.', // Represent the root directory as '.'
-                    files: mediaFiles
+                    path: ".", // Represent the root directory as '.'
+                    files: mediaFiles,
                 });
             }
 
@@ -136,14 +150,17 @@ async function processDirectories(files, basePath, currentPath, directories) {
 
         if (file.isDirectory()) {
             const subMediaFiles = await getMediaFiles(fullPath); // Get media files in the subdirectory
-            if (subMediaFiles.length > 0) { // Only add if not empty
+            if (subMediaFiles.length > 0) {
+                // Only add if not empty
                 directories.push({
-                    path: fullPath.replace(`${basePath}/`, ''), // Use relative path
-                    files: subMediaFiles
+                    path: fullPath.replace(`${basePath}/`, ""), // Use relative path
+                    files: subMediaFiles,
                 });
             }
             // Recursively process subdirectories
-            const subFiles = await fs.promises.readdir(fullPath, { withFileTypes: true });
+            const subFiles = await fs.promises.readdir(fullPath, {
+                withFileTypes: true,
+            });
             await processDirectories(subFiles, basePath, fullPath, directories); // Process subdirectory files
         }
     }
@@ -153,7 +170,7 @@ async function dims(imagePath) {
     return new Promise((resolve, reject) => {
         fs.readFile(imagePath, (err, buffer) => {
             if (err) {
-                console.error('Error reading file:', err);
+                console.error("Error reading file:", err);
                 resolve({ width: null, height: null }); // Resolve with nulls to avoid breaking
                 return;
             }
@@ -162,7 +179,7 @@ async function dims(imagePath) {
                 const dimensions = sizeOf(buffer);
                 resolve(dimensions);
             } catch (error) {
-                console.error('Error getting dimensions:', error);
+                console.error("Error getting dimensions:", error);
                 resolve({ width: null, height: null });
             }
         });
@@ -170,10 +187,9 @@ async function dims(imagePath) {
 }
 
 async function getMediaFiles(dirPath) {
-
     mainWindow.setTitle(`GridView - loading ${dirPath}`);
-    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif'];
-    const videoExtensions = ['.mp4', '.webm', '.mov', '.avi'];
+    const imageExtensions = [".png", ".jpg", ".jpeg", ".gif"];
+    const videoExtensions = [".mp4", ".webm", ".mov", ".avi"];
     const mediaFiles = [];
 
     try {
@@ -190,23 +206,22 @@ async function getMediaFiles(dirPath) {
                     width: d.width,
                     height: d.height,
                     path: fullPath,
-                    type: 'image'
+                    type: "image",
                 });
-            }
-            else if (videoExtensions.includes(extname)) {
+            } else if (videoExtensions.includes(extname)) {
                 const thumb = await generateVideoThumbnail(fullPath);
                 mediaFiles.push({
                     name: file,
                     path: fullPath,
-                    type: 'video',
-                    thumb: thumb,  // send the thumbnail path
+                    type: "video",
+                    thumb: thumb, // send the thumbnail path
                     width: null,
-                    height: null
+                    height: null,
                 });
             }
         }
     } catch (err) {
-        console.error('Error reading directory:', err);
+        console.error("Error reading directory:", err);
     }
 
     mainWindow.setTitle(`GridView - loaded ${dirPath}`);
@@ -215,9 +230,11 @@ async function getMediaFiles(dirPath) {
 
 function selectFile(filePath) {
     const absolutePath = path.resolve(filePath);
-    if (os.platform() === 'win32') { exec(`explorer /select, "${absolutePath.replace(/\//g, '\\')}"`); }
-    else if (os.platform() === 'darwin') { exec(`open -R "${absolutePath}"`); }
-    else {
+    if (os.platform() === "win32") {
+        exec(`explorer /select, "${absolutePath.replace(/\//g, "\\")}"`);
+    } else if (os.platform() === "darwin") {
+        exec(`open -R "${absolutePath}"`);
+    } else {
         //exec(`xdg-open "${path.dirname(absolutePath)}"`);
         exec(`dolphin --select "${absolutePath}"`);
     }
@@ -225,19 +242,27 @@ function selectFile(filePath) {
 
 function openFile(filePath) {
     const absolutePath = path.resolve(filePath);
-    if (os.platform() === 'win32') { exec(`start "" "${absolutePath.replace(/\//g, '\\')}"`); }
-    else if (os.platform() === 'darwin') { exec(`open "${absolutePath}"`); }
-    else { exec(`xdg-open "${absolutePath}"`); }
+    if (os.platform() === "win32") {
+        exec(`start "" "${absolutePath.replace(/\//g, "\\")}"`);
+    } else if (os.platform() === "darwin") {
+        exec(`open "${absolutePath}"`);
+    } else {
+        exec(`xdg-open "${absolutePath}"`);
+    }
 }
 
 // IPC listeners
-ipcMain.on('select-file', (event, filePath) => { selectFile(filePath); });
-ipcMain.on('open-file', (event, filePath) => { openFile(filePath); });
-ipcMain.on('drop-folder', async (event, dirPath) => {
+ipcMain.on("select-file", (event, filePath) => {
+    selectFile(filePath);
+});
+ipcMain.on("open-file", (event, filePath) => {
+    openFile(filePath);
+});
+ipcMain.on("drop-folder", async (event, dirPath) => {
     const directories = await loadDir(dirPath);
-    mainWindow.webContents.send('selected-directory', directories);
+    mainWindow.webContents.send("selected-directory", directories);
 });
 
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
 });
