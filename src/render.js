@@ -155,6 +155,7 @@ function addChildImage(div_file, file, div_file_info) {
 
     observer.observe(img);
     div_file.appendChild(img);
+    setupHoverPreview(div_file, file, img, false);
     return Promise.resolve();
 }
 
@@ -211,6 +212,8 @@ function addChildVideo(div_file, file, div_file_info) {
             div_file.innerHTML = ""; // Clear thumbnail + button
             div_file.appendChild(video);
         });
+
+        setupHoverPreview(div_file, file, thumbImg, true);
 
         resolve();
     });
@@ -319,3 +322,115 @@ window.electronAPI.onSelectedDirectory(async (event, directories) => {
     // Remove the loading GIF after all images/videos have loaded
     topbar.removeChild(loadingGif);
 });
+
+// Hover preview functionality
+function setupHoverPreview(
+    mediaWrapper,
+    mediaData,
+    thumbnailImg,
+    isVideo = false
+) {
+    let previewOverlay = null;
+    let lastVolume = 1.0;
+    let mainVideo = null;
+
+    const updatePreviewPosition = (e) => {
+        if (!previewOverlay) return;
+
+        const mediaElement = previewOverlay.querySelector("img, video");
+        const infoElement = previewOverlay.querySelector(
+            ".fcm_hover_preview_info"
+        );
+
+        if (mediaElement) {
+            const rect = mediaElement.getBoundingClientRect();
+            const buffer = 20;
+            let left = e.clientX + buffer;
+            let top = e.clientY + buffer;
+
+            if (left + rect.width > window.innerWidth) {
+                left = e.clientX - rect.width - buffer;
+            }
+            if (top + rect.height > window.innerHeight) {
+                top = e.clientY - rect.height - buffer;
+            }
+
+            left = Math.max(buffer, left);
+            top = Math.max(buffer, top);
+
+            mediaElement.style.left = left + "px";
+            mediaElement.style.top = top + "px";
+        }
+
+        if (infoElement) {
+            infoElement.style.left = "50%";
+            infoElement.style.bottom = "20px";
+            infoElement.style.transform = "translateX(-50%)";
+        }
+    };
+
+    const showPreview = (e) => {
+        if (!previewOverlay && setting_hoverZoom) {
+            previewOverlay = document.createElement("div");
+            previewOverlay.className = "fcm_hover_preview";
+
+            if (isVideo) {
+                mainVideo = mediaWrapper.querySelector("video");
+                const previewVideo = document.createElement("video");
+                previewVideo.src = `file://${mediaData.path}`;
+                previewVideo.loop = true;
+                previewVideo.playsInline = true;
+                previewVideo.controls = false;
+                previewVideo.autoplay = true;
+                previewVideo.volume = lastVolume;
+
+                previewVideo.addEventListener("wheel", (e) => {
+                    e.preventDefault();
+                    const delta = e.deltaY * -0.01;
+                    lastVolume = Math.max(
+                        0,
+                        Math.min(1, previewVideo.volume + delta)
+                    );
+                    previewVideo.volume = lastVolume;
+                });
+
+                if (mainVideo) {
+                    previewVideo.currentTime = mainVideo.currentTime;
+                    previewVideo.muted = false;
+                    mainVideo.muted = true;
+                }
+
+                previewOverlay.appendChild(previewVideo);
+            } else {
+                const previewImg = document.createElement("img");
+                previewImg.src = `file://${mediaData.path}`;
+                previewOverlay.appendChild(previewImg);
+            }
+
+            const previewInfo = document.createElement("div");
+            previewInfo.className = "fcm_hover_preview_info";
+            previewInfo.textContent = mediaData.name;
+            previewOverlay.appendChild(previewInfo);
+
+            document.body.appendChild(previewOverlay);
+        }
+        if (previewOverlay) {
+            previewOverlay.classList.add("active");
+            updatePreviewPosition(e);
+        }
+    };
+
+    const hidePreview = () => {
+        if (previewOverlay) {
+            previewOverlay.remove();
+            previewOverlay = null;
+            if (mainVideo) {
+                mainVideo.muted = false;
+            }
+        }
+    };
+
+    mediaWrapper.addEventListener("mouseenter", showPreview);
+    mediaWrapper.addEventListener("mousemove", updatePreviewPosition);
+    mediaWrapper.addEventListener("mouseleave", hidePreview);
+}

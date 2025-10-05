@@ -222,3 +222,42 @@ input[type='range']::-webkit-slider-thumb {
     color: white;
     pointer-events: none; /* Click passes to thumbnail */
 }
+
+.fcm_hover_preview {
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+}
+
+.fcm_hover_preview.active {
+    display: flex;
+}
+
+.fcm_hover_preview img,
+.fcm_hover_preview video {
+    max-width: 95vw;
+    max-height: 95vh;
+    object-fit: contain;
+    position: fixed;
+    transform: none;
+}
+
+.fcm_hover_preview_info {
+    position: fixed;
+    background-color: rgba(0,0,0,0.8);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    max-width: 90vw;
+    text-align: center;
+    word-break: break-all;
+    pointer-events: none;
+}
