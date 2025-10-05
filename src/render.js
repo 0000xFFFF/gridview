@@ -441,6 +441,10 @@ function setupHoverPreview(
     };
 
     const showPreview = (e) => {
+        document
+            .querySelectorAll(".fcm_hover_preview")
+            .forEach((el) => el.remove());
+
         if (!previewOverlay && setting_hoverZoom) {
             previewOverlay = document.createElement("div");
             previewOverlay.className = "fcm_hover_preview";
