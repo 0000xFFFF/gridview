@@ -103,9 +103,6 @@ function updatePriorities() {
             item.priority = "medium";
         }
     });
-
-    console.log(`queue length: ${loadQueue.length}`);
-
     processLoadQueue();
 }
 
