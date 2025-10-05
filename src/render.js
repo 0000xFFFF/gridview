@@ -161,11 +161,20 @@ function addChildImage(div_file, file, div_file_info) {
 
 function throttle(fn, delay) {
     let lastCall = 0;
+    let timeout;
+
     return function (...args) {
         const now = Date.now();
-        if (now - lastCall >= delay) {
-            fn.apply(this, args);
+
+        if (now - lastCall < delay) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                lastCall = Date.now();
+                fn.apply(this, args);
+            }, delay - (now - lastCall));
+        } else {
             lastCall = now;
+            fn.apply(this, args);
         }
     };
 }
@@ -234,7 +243,7 @@ function updatePriorities() {
 }
 
 // Add throttled priority updates
-const throttledUpdatePriorities = throttle(updatePriorities, 150);
+const throttledUpdatePriorities = throttle(updatePriorities, 3000);
 
 // Add scroll and resize listeners for priority updates
 window.addEventListener("scroll", throttledUpdatePriorities);
