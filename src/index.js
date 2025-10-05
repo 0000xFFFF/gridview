@@ -212,11 +212,10 @@ async function getMediaFiles(dirPath) {
             const extname = path.extname(file).toLowerCase();
 
             if (imageExtensions.includes(extname)) {
-                const d = await dims(fullPath);
                 mediaFiles.push({
                     name: file,
-                    width: d.width,
-                    height: d.height,
+                    width: null,
+                    height: null,
                     path: fullPath,
                     type: "image",
                 });
@@ -226,7 +225,7 @@ async function getMediaFiles(dirPath) {
                     name: file,
                     path: fullPath,
                     type: "video",
-                    thumb: thumb, // send the thumbnail path
+                    thumb: thumb,
                     width: null,
                     height: null,
                 });
@@ -251,6 +250,33 @@ function selectFile(filePath) {
         exec(`dolphin --select "${absolutePath}"`);
     }
 }
+
+function openFile(filePath) {
+    const absolutePath = path.resolve(filePath);
+    if (os.platform() === "win32") {
+        exec(`start "" "${absolutePath.replace(/\//g, "\\")}"`);
+    } else if (os.platform() === "darwin") {
+        exec(`open "${absolutePath}"`);
+    } else {
+        exec(`xdg-open "${absolutePath}"`);
+    }
+}
+
+// IPC listeners
+ipcMain.on("select-file", (event, filePath) => {
+    selectFile(filePath);
+});
+ipcMain.on("open-file", (event, filePath) => {
+    openFile(filePath);
+});
+ipcMain.on("drop-folder", async (event, dirPath) => {
+    const directories = await loadDir(dirPath);
+    mainWindow.webContents.send("selected-directory", directories);
+});
+
+app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+});
 
 function openFile(filePath) {
     const absolutePath = path.resolve(filePath);

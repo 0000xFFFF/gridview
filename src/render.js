@@ -34,47 +34,153 @@ function addFileInfo(div_file, file) {
     return div_file_info;
 }
 
+const CONCURRENT_LOADS = 3;
+const LOAD_DELAY = 10;
+const PRELOAD_VIEWPORT_BUFFER = 200;
+let loadQueue = [];
+let activeLoads = 0;
+let preloadCache = new Map();
+
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isNearViewport(element, buffer = PRELOAD_VIEWPORT_BUFFER) {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.bottom >= -buffer &&
+        rect.top <= window.innerHeight + buffer &&
+        rect.right >= -buffer &&
+        rect.left <= window.innerWidth + buffer
+    );
+}
+
+async function preloadImage(url, priority = "low") {
+    if (preloadCache.has(url)) {
+        return preloadCache.get(url);
+    }
+
+    return new Promise((resolve, reject) => {
+        loadQueue.push({ url, resolve, reject, priority });
+        processLoadQueue();
+    });
+}
+
+async function processLoadQueue() {
+    if (activeLoads >= CONCURRENT_LOADS || loadQueue.length === 0) return;
+
+    // Sort by priority
+    loadQueue.sort((a, b) => {
+        const priorities = { high: 3, medium: 2, low: 1 };
+        return priorities[b.priority] - priorities[a.priority];
+    });
+
+    const item = loadQueue.shift();
+    activeLoads++;
+
+    try {
+        await new Promise((resolve) => setTimeout(resolve, LOAD_DELAY));
+        preloadCache.set(item.url, true);
+        item.resolve();
+    } catch (error) {
+        item.reject(error);
+    } finally {
+        activeLoads--;
+        setTimeout(processLoadQueue, 50);
+    }
+}
+
 function addChildImage(div_file, file, div_file_info) {
     const img = document.createElement("img");
-    img.width = file.width;
-    img.height = file.height;
-    img.loading = "lazy"; // Just in case the browser supports native lazy loading
-    img.dataset.src = `file://${file.path}`; // Store the src in a data attribute
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.className = "media-file-img";
+    img.dataset.filepath = file.path;
 
-    const div_file_info_dims = document.createElement("span");
-    div_file_info_dims.className = "media-file-info-dims";
+    // Set placeholder
+    img.style.backgroundColor = "#1a1a1a";
+    img.style.minHeight = "100px";
 
-    // Image popup on hover
-    div_file.addEventListener("mouseenter", function () {
-        if (!setting_hoverZoom) {
-            return;
-        }
-        img_popup.src = img.src;
-        img_popup.style.display = "block";
-    });
-    div_file.addEventListener("mouseleave", function () {
-        img_popup.src = "";
-        img_popup.style.display = "none";
-    });
-
-    // Observer logic
-    const observer = new IntersectionObserver((entries, observer) => {
-        entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-                img.src = img.dataset.src; // Load the image
-                img.onload = () => {
-                    div_file_info_dims.textContent = `${img.naturalWidth}x${img.naturalHeight}`;
-                    div_file_info.appendChild(div_file_info_dims);
-                };
-                observer.unobserve(img); // Stop observing once the image is loaded
+    // Add hover priority handling
+    div_file.addEventListener("mouseenter", () => {
+        if (!img.src || img.src === img.dataset.placeholder) {
+            const url = `file://${file.path}`;
+            const item = loadQueue.find((i) => i.url === url);
+            if (item) {
+                item.priority = "high";
+                // Force reprocess queue with new priority
+                processLoadQueue();
+            } else if (!preloadCache.has(url)) {
+                // Start loading if not already loaded
+                loadImage("high");
             }
-        });
+        }
     });
 
-    observer.observe(img); // Observe the image element
-    div_file.appendChild(img);
+    const loadImage = async (priority = "low") => {
+        if (!isNearViewport(div_file)) return;
+        try {
+            const url = `file://${file.path}`;
 
-    return Promise.resolve(); // No need to wait for the image to load
+            // Check cache first
+            if (preloadCache.has(url)) {
+                img.src = url;
+                return;
+            }
+
+            // Add to load queue
+            await new Promise((resolve, reject) => {
+                loadQueue.push({ url, resolve, reject, priority });
+                processLoadQueue();
+            });
+
+            img.src = url;
+        } catch (err) {
+            console.error("Failed to load image:", err);
+        }
+    };
+
+    // Use Intersection Observer for lazy loading
+    const observer = new IntersectionObserver(
+        (entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    loadImage(isNearViewport(div_file) ? "medium" : "low");
+                    observer.unobserve(img);
+                }
+            });
+        },
+        { rootMargin: "200px" }
+    );
+
+    observer.observe(img);
+    div_file.appendChild(img);
+    return Promise.resolve();
+}
+
+function throttle(fn, delay) {
+    let lastCall = 0;
+    return function (...args) {
+        const now = Date.now();
+        if (now - lastCall >= delay) {
+            fn.apply(this, args);
+            lastCall = now;
+        }
+    };
+}
+
+function isElementInViewport(el) {
+    const rect = el.getBoundingClientRect();
+    return (
+        rect.top >= -rect.height &&
+        rect.left >= -rect.width &&
+        rect.top <=
+            (window.innerHeight || document.documentElement.clientHeight) +
+                rect.height &&
+        rect.left <=
+            (window.innerWidth || document.documentElement.clientWidth) +
+                rect.width
+    );
 }
 
 function addChildVideo(div_file, file, div_file_info) {
@@ -110,9 +216,31 @@ function addChildVideo(div_file, file, div_file_info) {
     });
 }
 
+function updatePriorities() {
+    document.querySelectorAll(".media-file-img").forEach((img) => {
+        if (!img.src || img.src === img.dataset.placeholder) {
+            const url = `file://${img.closest(".media-file").dataset.filepath}`;
+            const item = loadQueue.find((i) => i.url === url);
+            if (item) {
+                item.priority = isNearViewport(img) ? "high" : "low";
+            }
+        }
+    });
+    // Re-sort queue based on new priorities
+    processLoadQueue();
+}
+
+// Add throttled priority updates
+const throttledUpdatePriorities = throttle(updatePriorities, 150);
+
+// Add scroll and resize listeners for priority updates
+window.addEventListener("scroll", throttledUpdatePriorities);
+window.addEventListener("resize", throttledUpdatePriorities);
+
 function createFile(file) {
     const div_file = document.createElement("div");
     div_file.className = "media-file";
+    div_file.dataset.filepath = file.path; // Store filepath for priority updates
 
     // File info
     let div_file_info = addFileInfo(div_file, file);
