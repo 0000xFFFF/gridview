@@ -22,12 +22,15 @@ function addFileInfo(div_file, file) {
     div_file.addEventListener("mouseover", function () {
         div_file_info.style.display = "block";
         div_file_info.style.opacity = "1"; // Make it visible
+        document.title = `GridView - ${file.name}`;
     });
     div_file.addEventListener("mouseleave", function () {
         div_file_info.style.opacity = "0"; // Hide with transition
         setTimeout(() => {
             div_file_info.style.display = "none"; // Hide after transition
         }, 300); // Match this to the duration of the CSS transition
+
+        document.title = `GridView`;
     });
 
     div_file.appendChild(div_file_info);
@@ -482,10 +485,10 @@ function setupHoverPreview(
                 previewOverlay.appendChild(previewImg);
             }
 
-            const previewInfo = document.createElement("div");
-            previewInfo.className = "fcm_hover_preview_info";
-            previewInfo.textContent = mediaData.name;
-            previewOverlay.appendChild(previewInfo);
+            // const previewInfo = document.createElement("div");
+            // previewInfo.className = "fcm_hover_preview_info";
+            // previewInfo.textContent = mediaData.name;
+            // previewOverlay.appendChild(previewInfo);
 
             document.body.appendChild(previewOverlay);
         }
