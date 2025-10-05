@@ -166,7 +166,7 @@ async function processDirectories(files, basePath, currentPath, directories) {
     }
 }
 
-async function dims(imagePath) {
+async function getMediaDimensions(imagePath) {
     return new Promise((resolve, reject) => {
         fs.readFile(imagePath, (err, buffer) => {
             if (err) {
@@ -183,6 +183,18 @@ async function dims(imagePath) {
                 resolve({ width: null, height: null });
             }
         });
+    });
+}
+
+const getDims = false;
+
+async function dims(imagePath) {
+    if (getDims) {
+        return getMediaDimensions(imagePath);
+    }
+
+    return new Promise((resolve, reject) => {
+        return resolve({ width: null, height: null });
     });
 }
 
