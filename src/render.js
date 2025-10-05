@@ -297,7 +297,7 @@ function loadNextDirectory() {
     // Allow a small delay before setting isLoadingMore to false to prevent rapid firing
     setTimeout(() => {
         isLoadingMore = false;
-    }, 500);
+    }, 50);
 }
 
 function renderDirectory(dir) {
@@ -353,9 +353,8 @@ function loadMore() {
     }
 }
 
-const throttledLoadMore = throttle(loadMore, 50);
-window.addEventListener("scroll", throttledLoadMore);
-window.addEventListener("resize", throttledLoadMore);
+window.addEventListener("scroll", loadMore);
+window.addEventListener("resize", loadMore);
 
 // Hover preview functionality
 function setupHoverPreview(

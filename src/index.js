@@ -74,7 +74,7 @@ const GET_DIMS = false;
 
 async function generateVideoThumbnail(videoPath) {
     return new Promise((resolve, reject) => {
-        if (LOAD_THUMBS) {
+        if (!LOAD_THUMBS) {
             return resolve(null);
         }
 
