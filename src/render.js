@@ -55,13 +55,13 @@ function isNearViewport(element, buffer = PRELOAD_VIEWPORT_BUFFER) {
     );
 }
 
-async function preloadImage(url, priority = "low") {
+async function preloadMedia(url, element, priority = "low") {
     if (preloadCache.has(url)) {
         return preloadCache.get(url);
     }
 
     return new Promise((resolve, reject) => {
-        loadQueue.push({ url, resolve, reject, priority });
+        loadQueue.push({ url, resolve, reject, priority, element: element });
         processLoadQueue();
     });
 }
@@ -86,78 +86,63 @@ async function processLoadQueue() {
         item.reject(error);
     } finally {
         activeLoads--;
-        setTimeout(processLoadQueue, 50);
+        setTimeout(processLoadQueue, 10);
     }
 }
 
-function addChildImage(div_file, file, div_file_info) {
-    const img = document.createElement("img");
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.className = "media-file-img";
-    img.dataset.filepath = file.path;
+function updateQueuePriority(url, newPriority) {
+    const item = loadQueue.find((i) => i.url === url);
+    if (item) {
+        item.priority = newPriority;
+    }
+}
 
-    // Set placeholder
-    img.style.backgroundColor = "#1a1a1a";
-    img.style.minHeight = "100px";
-
-    // Add hover priority handling
-    div_file.addEventListener("mouseenter", () => {
-        if (!img.src || img.src === img.dataset.placeholder) {
-            const url = `file://${file.path}`;
-            const item = loadQueue.find((i) => i.url === url);
-            if (item) {
-                item.priority = "high";
-                // Force reprocess queue with new priority
-                processLoadQueue();
-            } else if (!preloadCache.has(url)) {
-                // Start loading if not already loaded
-                loadImage("high");
-            }
+function updatePriorities() {
+    loadQueue.forEach((item) => {
+        if (isNearViewport(item.element)) {
+            item.priority = "medium";
         }
     });
 
-    const loadImage = async (priority = "low") => {
-        if (!isNearViewport(div_file)) return;
-        try {
-            const url = `file://${file.path}`;
+    console.log(`queue length: ${loadQueue.length}`);
 
-            // Check cache first
-            if (preloadCache.has(url)) {
-                img.src = url;
-                return;
-            }
-
-            // Add to load queue
-            await new Promise((resolve, reject) => {
-                loadQueue.push({ url, resolve, reject, priority });
-                processLoadQueue();
-            });
-
-            img.src = url;
-        } catch (err) {
-            console.error("Failed to load image:", err);
-        }
-    };
-
-    // Use Intersection Observer for lazy loading
-    const observer = new IntersectionObserver(
-        (entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    loadImage(isNearViewport(div_file) ? "medium" : "low");
-                    observer.unobserve(img);
-                }
-            });
-        },
-        { rootMargin: "200px" }
-    );
-
-    observer.observe(img);
-    div_file.appendChild(img);
-    setupHoverPreview(div_file, file, img, false);
-    return Promise.resolve();
+    processLoadQueue();
 }
+
+// Intersection Observer for lazy loading
+const imageObserver = new IntersectionObserver(
+    (entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const fullUrl = img.dataset.filepath;
+
+                if (fullUrl && !img.dataset.loading) {
+                    img.dataset.loading = "true";
+
+                    preloadMedia(
+                        fullUrl,
+                        img,
+                        isNearViewport(img) ? "medium" : "low"
+                    )
+                        .then((fullImg) => {
+                            setTimeout(() => {
+                                img.src = fullUrl;
+                                img.removeAttribute("data-full-url");
+                                img.removeAttribute("data-loading");
+                            }, 200);
+                        })
+                        .catch(() => {
+                            img.removeAttribute("data-loading");
+                        });
+                }
+            }
+        });
+    },
+    {
+        rootMargin: "200px", // Start loading 200px before entering viewport
+    }
+);
 
 function throttle(fn, delay) {
     let lastCall = 0;
@@ -179,6 +164,13 @@ function throttle(fn, delay) {
     };
 }
 
+// Add throttled priority updates
+const throttledUpdatePriorities = throttle(updatePriorities, 3000);
+
+// Add scroll and resize listeners for priority updates
+window.addEventListener("scroll", throttledUpdatePriorities);
+window.addEventListener("resize", throttledUpdatePriorities);
+
 function isElementInViewport(el) {
     const rect = el.getBoundingClientRect();
     return (
@@ -191,6 +183,28 @@ function isElementInViewport(el) {
             (window.innerWidth || document.documentElement.clientWidth) +
                 rect.width
     );
+}
+
+function addChildImage(div_file, file, div_file_info) {
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.className = "media-file-img";
+    img.dataset.filepath = file.path;
+
+    // Set placeholder
+    img.style.backgroundColor = "#1a1a1a";
+    img.style.minHeight = "100px";
+
+    // Add hover priority handling
+    img.addEventListener("mouseenter", () => {
+        updateQueuePriority(file.path, "high");
+    });
+
+    imageObserver.observe(img);
+    div_file.appendChild(img);
+    setupHoverPreview(div_file, file, img, false);
+    return Promise.resolve();
 }
 
 function addChildVideo(div_file, file, div_file_info) {
@@ -227,27 +241,6 @@ function addChildVideo(div_file, file, div_file_info) {
         resolve();
     });
 }
-
-function updatePriorities() {
-    document.querySelectorAll(".media-file-img").forEach((img) => {
-        if (!img.src || img.src === img.dataset.placeholder) {
-            const url = `file://${img.closest(".media-file").dataset.filepath}`;
-            const item = loadQueue.find((i) => i.url === url);
-            if (item) {
-                item.priority = isNearViewport(img) ? "medium" : "low";
-            }
-        }
-    });
-    // Re-sort queue based on new priorities
-    processLoadQueue();
-}
-
-// Add throttled priority updates
-const throttledUpdatePriorities = throttle(updatePriorities, 3000);
-
-// Add scroll and resize listeners for priority updates
-window.addEventListener("scroll", throttledUpdatePriorities);
-window.addEventListener("resize", throttledUpdatePriorities);
 
 function createFile(file) {
     const div_file = document.createElement("div");
