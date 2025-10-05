@@ -68,11 +68,13 @@ app.whenReady().then(() => {
 
 fs.mkdirSync(thumbDir, { recursive: true });
 
-const DISABLE_THUMBS = true;
+// TODO: these need to be done async lazyly when needed
+const LOAD_THUMBS = false;
+const GET_DIMS = false;
 
 async function generateVideoThumbnail(videoPath) {
     return new Promise((resolve, reject) => {
-        if (DISABLE_THUMBS) {
+        if (LOAD_THUMBS) {
             return resolve(null);
         }
 
@@ -95,6 +97,32 @@ async function generateVideoThumbnail(videoPath) {
                 resolve(null);
             } else {
                 resolve(thumbPath);
+            }
+        });
+    });
+}
+
+async function dims(imagePath) {
+    if (!GET_DIMS) {
+        return new Promise((resolve, reject) => {
+            return resolve({ width: null, height: null });
+        });
+    }
+
+    return new Promise((resolve, reject) => {
+        fs.readFile(imagePath, (err, buffer) => {
+            if (err) {
+                console.error("Error reading file:", err);
+                resolve({ width: null, height: null }); // Resolve with nulls to avoid breaking
+                return;
+            }
+
+            try {
+                const dimensions = sizeOf(buffer);
+                resolve(dimensions);
+            } catch (error) {
+                console.error("Error getting dimensions:", error);
+                resolve({ width: null, height: null });
             }
         });
     });
@@ -170,38 +198,6 @@ async function processDirectories(files, basePath, currentPath, directories) {
             await processDirectories(subFiles, basePath, fullPath, directories); // Process subdirectory files
         }
     }
-}
-
-async function getMediaDimensions(imagePath) {
-    return new Promise((resolve, reject) => {
-        fs.readFile(imagePath, (err, buffer) => {
-            if (err) {
-                console.error("Error reading file:", err);
-                resolve({ width: null, height: null }); // Resolve with nulls to avoid breaking
-                return;
-            }
-
-            try {
-                const dimensions = sizeOf(buffer);
-                resolve(dimensions);
-            } catch (error) {
-                console.error("Error getting dimensions:", error);
-                resolve({ width: null, height: null });
-            }
-        });
-    });
-}
-
-const getDims = false;
-
-async function dims(imagePath) {
-    if (getDims) {
-        return getMediaDimensions(imagePath);
-    }
-
-    return new Promise((resolve, reject) => {
-        return resolve({ width: null, height: null });
-    });
 }
 
 async function getMediaFiles(dirPath) {
