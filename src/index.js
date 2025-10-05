@@ -68,8 +68,14 @@ app.whenReady().then(() => {
 
 fs.mkdirSync(thumbDir, { recursive: true });
 
+const DISABLE_THUMBS = true;
+
 async function generateVideoThumbnail(videoPath) {
     return new Promise((resolve, reject) => {
+        if (DISABLE_THUMBS) {
+            return resolve(null);
+        }
+
         const thumbPath = path.join(
             thumbDir,
             path.basename(videoPath) + ".jpg"
