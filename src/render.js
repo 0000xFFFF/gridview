@@ -144,6 +144,41 @@ const imageObserver = new IntersectionObserver(
     }
 );
 
+// Intersection Observer for lazy loading video thumbnails
+const videoObserver = new IntersectionObserver(
+    (entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                const thumbImg = entry.target;
+                const videoPath = thumbImg.dataset.videopath;
+
+                if (videoPath && !thumbImg.dataset.loading) {
+                    thumbImg.dataset.loading = "true";
+                    window.electronAPI
+                        .generateVideoThumbnail(videoPath)
+                        .then((thumbPath) => {
+                            if (thumbPath) {
+                                thumbImg.src = `file://${thumbPath}`;
+                            } else {
+                                // Maybe set a "no thumbnail" image
+                            }
+                            thumbImg.removeAttribute("data-loading");
+                            thumbImg.removeAttribute("data-videopath");
+                        })
+                        .catch((err) => {
+                            console.error("Thumbnail generation failed:", err);
+                            thumbImg.removeAttribute("data-loading");
+                        });
+                    videoObserver.unobserve(thumbImg);
+                }
+            }
+        });
+    },
+    {
+        rootMargin: "200px",
+    }
+);
+
 function throttle(fn, delay) {
     let lastCall = 0;
     let timeout;
@@ -214,8 +249,14 @@ function addChildVideo(div_file, file, div_file_info) {
 
         // Thumbnail image
         const thumbImg = document.createElement("img");
-        thumbImg.src = `file://${file.thumb || file.path}`;
         thumbImg.className = "video-thumb";
+        thumbImg.dataset.videopath = file.path;
+
+        // Set placeholder style
+        thumbImg.style.backgroundColor = "#1a1a1a";
+        thumbImg.style.minHeight = "100px";
+
+        videoObserver.observe(thumbImg);
         div_file.appendChild(thumbImg);
 
         // Play button overlay

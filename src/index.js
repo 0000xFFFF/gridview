@@ -69,7 +69,7 @@ app.whenReady().then(() => {
 fs.mkdirSync(thumbDir, { recursive: true });
 
 // TODO: these need to be done async lazyly when needed
-const LOAD_THUMBS = false;
+const LOAD_THUMBS = true;
 const GET_DIMS = false;
 
 async function generateVideoThumbnail(videoPath) {
@@ -222,12 +222,11 @@ async function getMediaFiles(dirPath) {
                     type: "image",
                 });
             } else if (videoExtensions.includes(extname)) {
-                const thumb = await generateVideoThumbnail(fullPath);
                 mediaFiles.push({
                     name: file,
                     path: fullPath,
                     type: "video",
-                    thumb: thumb,
+                    thumb: null,
                     width: null,
                     height: null,
                 });
@@ -274,6 +273,11 @@ ipcMain.on("open-file", (event, filePath) => {
 ipcMain.on("drop-folder", async (event, dirPath) => {
     const directories = await loadDir(dirPath);
     mainWindow.webContents.send("selected-directory", directories);
+});
+
+ipcMain.handle("generate-video-thumbnail", async (event, videoPath) => {
+    const thumbPath = await generateVideoThumbnail(videoPath);
+    return thumbPath;
 });
 
 app.on("window-all-closed", () => {
