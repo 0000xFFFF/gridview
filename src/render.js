@@ -234,7 +234,7 @@ function updatePriorities() {
             const url = `file://${img.closest(".media-file").dataset.filepath}`;
             const item = loadQueue.find((i) => i.url === url);
             if (item) {
-                item.priority = isNearViewport(img) ? "high" : "low";
+                item.priority = isNearViewport(img) ? "medium" : "low";
             }
         }
     });
