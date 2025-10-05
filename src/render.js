@@ -273,57 +273,89 @@ function createFile(file) {
     return Promise.resolve(div_file); // Return the div_file if no async media loading is required
 }
 
+let allDirectories = [];
+let currentDirIndex = 0;
+let isLoadingMore = false;
+const footer = document.createElement("div");
+const loadingGif = document.createElement("img");
+loadingGif.src = "../assets/load.gif";
+loadingGif.className = "loading-gif";
+footer.appendChild(loadingGif);
+footer.id = "infinite-scroll-footer";
+footer.style.display = "none";
+document.getElementById("media-dirs").appendChild(footer);
+
+function loadNextDirectory() {
+    if (currentDirIndex >= allDirectories.length) {
+        footer.style.display = "none";
+        return;
+    }
+
+    isLoadingMore = true;
+    renderDirectory(allDirectories[currentDirIndex]);
+    currentDirIndex++;
+    // Allow a small delay before setting isLoadingMore to false to prevent rapid firing
+    setTimeout(() => {
+        isLoadingMore = false;
+    }, 500);
+}
+
+function renderDirectory(dir) {
+    const div_dir = document.createElement("div");
+    div_dir.className = "media-dir";
+
+    const div_dir_head = document.createElement("div");
+    div_dir_head.className = "media-dir-head";
+    const h1 = document.createElement("h1");
+    h1.textContent = dir.path;
+    div_dir_head.appendChild(h1);
+    div_dir.appendChild(div_dir_head);
+
+    const div_dir_files = document.createElement("div");
+    div_dir_files.className = "media-dir-files";
+    div_dir_files.style.columnCount = setting_cols;
+
+    for (const file of dir.files) {
+        createFile(file).then((div_file) => {
+            div_dir_files.appendChild(div_file);
+        });
+    }
+
+    div_dir.appendChild(div_dir_files);
+    const mediaDirs = document.getElementById("media-dirs");
+    mediaDirs.insertBefore(div_dir, footer); // Insert before the footer
+}
+
+// Replace the existing onSelectedDirectory handler with this one
 window.electronAPI.onSelectedDirectory(async (event, directories) => {
     const div_dirs = document.getElementById("media-dirs");
     div_dirs.innerHTML = ""; // Clear existing content
+    div_dirs.appendChild(footer); // Re-add footer after clearing
 
-    const topbar = document.getElementById("topbar");
+    allDirectories = directories;
+    currentDirIndex = 0;
+    isLoadingMore = false;
 
-    // Show loading GIF in topbar
-    const loadingGif = document.createElement("img");
-    loadingGif.src = "../assets/load.gif"; // Replace with the actual path to your GIF
-    loadingGif.className = "loading-gif"; // Optional: Add a class for styling
-    topbar.appendChild(loadingGif); // Add the loading GIF to the topbar
-
-    const loadPromises = []; // Array to store image/video loading promises
-
-    for (const dir of directories) {
-        const div_dir = document.createElement("div");
-        div_dir.className = "media-dir";
-
-        const div_dir_head = document.createElement("div");
-        div_dir_head.className = "media-dir-head";
-        const h1 = document.createElement("h1");
-        h1.textContent = dir.path;
-        div_dir_head.appendChild(h1);
-        div_dir.appendChild(div_dir_head);
-
-        const div_dir_files = document.createElement("div");
-        div_dir_files.className = "media-dir-files";
-        div_dir_files.style.columnCount = setting_cols;
-
-        for (const file of dir.files) {
-            // Create the file element and append it immediately
-            const filePromise = createFile(file).then((div_file) => {
-                div_dir_files.appendChild(div_file);
-            });
-            loadPromises.push(filePromise); // Add the promise to the loadPromises array
-        }
-
-        div_dir.append(div_dir_files);
-        div_dirs.append(div_dir);
+    // Load the first directory
+    if (allDirectories.length > 0) {
+        loadNextDirectory();
     }
 
-    // Wait for all images/videos to load
-    try {
-        await Promise.all(loadPromises);
-    } catch (err) {
-        console.error("Error loading some files:", err);
-    }
-
-    // Remove the loading GIF after all images/videos have loaded
-    topbar.removeChild(loadingGif);
+    // Start observing the footer
+    footer.style.display = "flex";
 });
+
+function loadMore() {
+    if (isLoadingMore) return;
+
+    if (isElementInViewport(footer)) {
+        loadNextDirectory();
+    }
+}
+
+const throttledLoadMore = throttle(loadMore, 50);
+window.addEventListener("scroll", throttledLoadMore);
+window.addEventListener("resize", throttledLoadMore);
 
 // Hover preview functionality
 function setupHoverPreview(

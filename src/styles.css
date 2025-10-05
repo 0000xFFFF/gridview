@@ -28,6 +28,11 @@ h1 {
     background-color: rgba(0, 100, 0, 0.3);
 }
 
+.media-dir {
+    contain: content;
+    will-change: transform;
+}
+
 .media-dir-files {
     column-count: 6; /* Number of columns, adjust as needed */
     column-gap: 5px; /* Space between the columns */
@@ -37,6 +42,8 @@ h1 {
     display: inline-block;
     margin-bottom: 5px; /* Space between items */
     width: 100%;
+    contain: content;
+    will-change: transform;
 }
 
 .media-file img,
@@ -260,4 +267,13 @@ input[type='range']::-webkit-slider-thumb {
     text-align: center;
     word-break: break-all;
     pointer-events: none;
+}
+
+#infinite-scroll-footer {
+    width: 100%;
+    height: 50px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
