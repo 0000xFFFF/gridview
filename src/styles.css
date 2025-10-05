@@ -9,12 +9,16 @@ body {
     color: var(--main-color-white);
     background-color: var(--main-color-background)
 }
+
+* {
+    color: var(--main-color-orange);
+}
+
 h1 {
     text-align: left;
-    color: var(--main-color-orange);
-    border-bottom: 2px solid var(--main-color-orange);
     padding: 3px 3px 3px 10px;
     margin: 0;
+    flex-grow: 1; /* Allow h1 to take up available space */
 }
 
 #media-dirs {
@@ -31,6 +35,22 @@ h1 {
 .media-dir {
     contain: content;
     will-change: transform;
+    margin-bottom: 20px;
+}
+
+.media-dir-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+    border-bottom: 2px solid var(--main-color-orange);
+}
+
+.media-dir-info {
+    color: var(--main-color-orange);
+    font-size: 1em;
+    white-space: nowrap;
+    padding-right: 10px;
 }
 
 .media-dir-files {

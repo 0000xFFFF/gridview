@@ -333,7 +333,11 @@ function loadNextDirectory() {
     }
 
     isLoadingMore = true;
-    renderDirectory(allDirectories[currentDirIndex]);
+    renderDirectory(
+        allDirectories[currentDirIndex],
+        currentDirIndex + 1,
+        allDirectories.length
+    );
     currentDirIndex++;
     // Allow a small delay before setting isLoadingMore to false to prevent rapid firing
     setTimeout(() => {
@@ -341,7 +345,7 @@ function loadNextDirectory() {
     }, 50);
 }
 
-function renderDirectory(dir) {
+function renderDirectory(dir, index, total) {
     const div_dir = document.createElement("div");
     div_dir.className = "media-dir";
 
@@ -350,6 +354,12 @@ function renderDirectory(dir) {
     const h1 = document.createElement("h1");
     h1.textContent = dir.path;
     div_dir_head.appendChild(h1);
+
+    const dirInfo = document.createElement("span");
+    dirInfo.className = "media-dir-info";
+    dirInfo.textContent = `(${index}/${total}) - ${dir.files.length} files`;
+    div_dir_head.appendChild(dirInfo);
+
     div_dir.appendChild(div_dir_head);
 
     const div_dir_files = document.createElement("div");
