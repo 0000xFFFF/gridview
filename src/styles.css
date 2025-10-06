@@ -70,8 +70,7 @@ h1 {
 .media-file img,
 .media-file video {
     display: block;
-    width: 100%;
-    height: auto;
+    width: -webkit-fill-available;
     min-width: 32px;
     min-height: 32px;
     max-width: 95vw;
