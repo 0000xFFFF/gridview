@@ -15,7 +15,14 @@ const sizeOf = require("image-size").default || require("image-size");
 const thumbDir = path.join(app.getPath("userData"), "thumbs");
 let mainWindow;
 
-app.whenReady().then(() => {
+// Handle command line arguments
+const startupDir = process.argv.find((arg, index) => {
+    // Skip the first two arguments (electron and script path)
+    if (index <= 1) return false;
+    return fs.existsSync(arg) && fs.statSync(arg).isDirectory();
+});
+
+app.whenReady().then(async () => {
     // WINDOW SETTINGS
     mainWindow = new BrowserWindow({
         width: 800,
@@ -33,7 +40,13 @@ app.whenReady().then(() => {
 
     // LOAD INDEX
     const startUrl = path.join(app.getAppPath(), "src", "index.html");
-    mainWindow.loadFile(startUrl);
+    await mainWindow.loadFile(startUrl);
+
+    // If directory was provided in arguments, load it
+    if (startupDir) {
+        const directories = await loadDir(startupDir);
+        mainWindow.webContents.send("selected-directory", directories);
+    }
 
     // MENU SETUP
     const menu = Menu.buildFromTemplate([
@@ -278,33 +291,6 @@ ipcMain.on("drop-folder", async (event, dirPath) => {
 ipcMain.handle("generate-video-thumbnail", async (event, videoPath) => {
     const thumbPath = await generateVideoThumbnail(videoPath);
     return thumbPath;
-});
-
-app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") app.quit();
-});
-
-function openFile(filePath) {
-    const absolutePath = path.resolve(filePath);
-    if (os.platform() === "win32") {
-        exec(`start "" "${absolutePath.replace(/\//g, "\\")}"`);
-    } else if (os.platform() === "darwin") {
-        exec(`open "${absolutePath}"`);
-    } else {
-        exec(`xdg-open "${absolutePath}"`);
-    }
-}
-
-// IPC listeners
-ipcMain.on("select-file", (event, filePath) => {
-    selectFile(filePath);
-});
-ipcMain.on("open-file", (event, filePath) => {
-    openFile(filePath);
-});
-ipcMain.on("drop-folder", async (event, dirPath) => {
-    const directories = await loadDir(dirPath);
-    mainWindow.webContents.send("selected-directory", directories);
 });
 
 app.on("window-all-closed", () => {
