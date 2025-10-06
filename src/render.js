@@ -2,6 +2,33 @@ const img_popup = document.createElement("img");
 img_popup.className = "media-file-popup";
 document.body.appendChild(img_popup);
 
+function isElementInViewport(el) {
+    const rect = el.getBoundingClientRect();
+    return (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <=
+            (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <=
+            (window.innerWidth || document.documentElement.clientWidth)
+    );
+}
+
+function isNearViewport(el) {
+    const rect = el.getBoundingClientRect();
+    const buffer = 1080 * 2; // pixels
+    return (
+        rect.top <
+            (window.innerHeight || document.documentElement.clientHeight) +
+                buffer &&
+        rect.bottom > -buffer &&
+        rect.left <
+            (window.innerWidth || document.documentElement.clientWidth) +
+                buffer &&
+        rect.right > -buffer
+    );
+}
+
 function addFileInfo(div_file, file) {
     const zoomCb = document.getElementById("setting_cb_hoverZoom");
 
@@ -12,9 +39,6 @@ function addFileInfo(div_file, file) {
     div_file_info_name.className = "media-file-info-name";
     div_file_info_name.addEventListener("mouseup", (event) => {
         switch (event.button) {
-            case 0:
-                zoomCb.checked = !zoomCb.checked;
-                break;
             case 1:
                 ipcRenderer.send("open-file", file.path);
                 break;
@@ -42,118 +66,11 @@ function addFileInfo(div_file, file) {
     return div_file_info;
 }
 
-const CONCURRENT_LOADS = 3;
-const LOAD_DELAY = 10;
-const PRELOAD_VIEWPORT_BUFFER = 200;
-let loadQueue = [];
-let activeLoads = 0;
-let preloadCache = new Map();
-
-function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isNearViewport(element, buffer = PRELOAD_VIEWPORT_BUFFER) {
-    const rect = element.getBoundingClientRect();
-    return (
-        rect.bottom >= -buffer &&
-        rect.top <= window.innerHeight + buffer &&
-        rect.right >= -buffer &&
-        rect.left <= window.innerWidth + buffer
-    );
-}
-
-async function preloadMedia(url, element, priority = "low") {
-    if (preloadCache.has(url)) {
-        return preloadCache.get(url);
-    }
-
-    return new Promise((resolve, reject) => {
-        loadQueue.push({ url, resolve, reject, priority, element: element });
-        processLoadQueue();
-    });
-}
-
-async function processLoadQueue() {
-    if (activeLoads >= CONCURRENT_LOADS || loadQueue.length === 0) return;
-
-    // Sort by priority
-    loadQueue.sort((a, b) => {
-        const priorities = { high: 3, medium: 2, low: 1 };
-        return priorities[b.priority] - priorities[a.priority];
-    });
-
-    const item = loadQueue.shift();
-    activeLoads++;
-
-    try {
-        await new Promise((resolve) => setTimeout(resolve, LOAD_DELAY));
-        preloadCache.set(item.url, true);
-        item.resolve();
-    } catch (error) {
-        item.reject(error);
-    } finally {
-        activeLoads--;
-        setTimeout(processLoadQueue, 10);
-    }
-}
-
-function updateQueuePriority(url, newPriority) {
-    const item = loadQueue.find((i) => i.url === url);
-    if (item) {
-        item.priority = newPriority;
-    }
-}
-
-function updatePriorities() {
-    loadQueue.forEach((item) => {
-        if (isNearViewport(item.element)) {
-            item.priority = "medium";
-        }
-    });
-    processLoadQueue();
-}
-
-// Intersection Observer for lazy loading
-const imageObserver = new IntersectionObserver(
-    (entries) => {
-        entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                const fullUrl = img.dataset.filepath;
-
-                if (fullUrl && !img.dataset.loading) {
-                    img.dataset.loading = "true";
-
-                    preloadMedia(
-                        fullUrl,
-                        img,
-                        isNearViewport(img) ? "medium" : "low"
-                    )
-                        .then((fullImg) => {
-                            setTimeout(() => {
-                                img.src = fullUrl;
-                                img.removeAttribute("data-full-url");
-                                img.removeAttribute("data-loading");
-                            }, 200);
-                        })
-                        .catch(() => {
-                            img.removeAttribute("data-loading");
-                        });
-                }
-            }
-        });
-    },
-    {
-        rootMargin: "200px", // Start loading 200px before entering viewport
-    }
-);
-
 // Intersection Observer for lazy loading video thumbnails
 const videoObserver = new IntersectionObserver(
     (entries) => {
         entries.forEach((entry) => {
-            if (entry.isIntersecting) {
+            if (isNearViewport(entry.target)) {
                 const thumbImg = entry.target;
                 const videoPath = thumbImg.dataset.videopath;
 
@@ -184,50 +101,10 @@ const videoObserver = new IntersectionObserver(
     }
 );
 
-function throttle(fn, delay) {
-    let lastCall = 0;
-    let timeout;
-
-    return function (...args) {
-        const now = Date.now();
-
-        if (now - lastCall < delay) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-                lastCall = Date.now();
-                fn.apply(this, args);
-            }, delay - (now - lastCall));
-        } else {
-            lastCall = now;
-            fn.apply(this, args);
-        }
-    };
-}
-
-// Add throttled priority updates
-const throttledUpdatePriorities = throttle(updatePriorities, 3000);
-
-// Add scroll and resize listeners for priority updates
-window.addEventListener("scroll", throttledUpdatePriorities);
-window.addEventListener("resize", throttledUpdatePriorities);
-
-function isElementInViewport(el) {
-    const rect = el.getBoundingClientRect();
-    return (
-        rect.top >= -rect.height &&
-        rect.left >= -rect.width &&
-        rect.top <=
-            (window.innerHeight || document.documentElement.clientHeight) +
-                rect.height &&
-        rect.left <=
-            (window.innerWidth || document.documentElement.clientWidth) +
-                rect.width
-    );
-}
-
 function addChildImage(div_file, file, div_file_info) {
     const img = document.createElement("img");
-    img.loading = "lazy";
+    img.src = file.path;
+    img.loading = "eager";
     img.decoding = "async";
     img.className = "media-file-img";
     img.dataset.filepath = file.path;
@@ -236,12 +113,6 @@ function addChildImage(div_file, file, div_file_info) {
     img.style.backgroundColor = "#1a1a1a";
     img.style.minHeight = "100px";
 
-    // Add hover priority handling
-    img.addEventListener("mouseenter", () => {
-        updateQueuePriority(file.path, "high");
-    });
-
-    imageObserver.observe(img);
     div_file.appendChild(img);
     setupHoverPreview(div_file, file, img, false);
     return Promise.resolve();
@@ -338,13 +209,27 @@ function loadNextDirectory() {
     }
 
     isLoadingMore = true;
+
+    // Render current directory
     renderDirectory(
         allDirectories[currentDirIndex],
         currentDirIndex + 1,
         allDirectories.length
     );
+
+    // Immediately render next directory if available
+    if (currentDirIndex + 1 < allDirectories.length) {
+        setTimeout(() => {
+            renderDirectory(
+                allDirectories[currentDirIndex + 1],
+                currentDirIndex + 2,
+                allDirectories.length
+            );
+        }, 100);
+    }
+
     currentDirIndex++;
-    // Allow a small delay before setting isLoadingMore to false to prevent rapid firing
+
     setTimeout(() => {
         isLoadingMore = false;
     }, 50);
@@ -378,7 +263,7 @@ function renderDirectory(dir, index, total) {
 
     div_dir.appendChild(div_dir_files);
     const mediaDirs = document.getElementById("media-dirs");
-    mediaDirs.insertBefore(div_dir, footer); // Insert before the footer
+    mediaDirs.insertBefore(div_dir, footer);
 }
 
 // Replace the existing onSelectedDirectory handler with this one
@@ -403,13 +288,14 @@ window.electronAPI.onSelectedDirectory(async (event, directories) => {
 function loadMore() {
     if (isLoadingMore) return;
 
-    if (isElementInViewport(footer)) {
+    if (isNearViewport(footer)) {
         loadNextDirectory();
     }
 }
 
-window.addEventListener("scroll", loadMore);
-window.addEventListener("resize", loadMore);
+setInterval(() => {
+    loadMore();
+}, 500);
 
 // Hover preview functionality
 function setupHoverPreview(
