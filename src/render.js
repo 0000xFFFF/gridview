@@ -3,6 +3,8 @@ img_popup.className = "media-file-popup";
 document.body.appendChild(img_popup);
 
 function addFileInfo(div_file, file) {
+    const zoomCb = document.getElementById("setting_cb_hoverZoom");
+
     const div_file_info = document.createElement("span");
     div_file_info.className = "media-file-info";
     const div_file_info_name = document.createElement("a");
@@ -10,6 +12,9 @@ function addFileInfo(div_file, file) {
     div_file_info_name.className = "media-file-info-name";
     div_file_info_name.addEventListener("mouseup", (event) => {
         switch (event.button) {
+            case 0:
+                zoomCb.checked = !zoomCb.checked;
+                break;
             case 1:
                 ipcRenderer.send("open-file", file.path);
                 break;
@@ -364,7 +369,6 @@ function renderDirectory(dir, index, total) {
 
     const div_dir_files = document.createElement("div");
     div_dir_files.className = "media-dir-files";
-    div_dir_files.style.columnCount = setting_cols;
 
     for (const file of dir.files) {
         createFile(file).then((div_file) => {
@@ -453,12 +457,16 @@ function setupHoverPreview(
         }
     };
 
+    const setting_cb_hoverZoom = document.getElementById(
+        "setting_cb_hoverZoom"
+    );
+
     const showPreview = (e) => {
         document
             .querySelectorAll(".fcm_hover_preview")
             .forEach((el) => el.remove());
 
-        if (!previewOverlay && setting_hoverZoom) {
+        if (!previewOverlay && setting_cb_hoverZoom.checked) {
             previewOverlay = document.createElement("div");
             previewOverlay.className = "fcm_hover_preview";
 

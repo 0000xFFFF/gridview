@@ -10,23 +10,20 @@ window.onscroll = function () {
 
 // setting: hover zoom
 let cb_hoverZoom = document.getElementById("setting_cb_hoverZoom");
-cb_hoverZoom.checked = setting_hoverZoom;
-cb_hoverZoom.addEventListener("change", function () {
-    setting_hoverZoom = !setting_hoverZoom;
-});
-function hoverZoom_check() {
-    setting_hoverZoom = cb_hoverZoom.checked = !cb_hoverZoom.checked;
+cb_hoverZoom.checked = default_setting_hoverZoom;
+function hoverZoom_toggle() {
+    cb_hoverZoom.checked = !cb_hoverZoom.checked;
 }
 
 // setting: media cols slider
 let slider = document.getElementById("setting_slider_cols");
 let slider_label = document.getElementById("setting_slider_cols_label");
 function slider_update() {
-    slider_label.innerHTML = setting_cols = slider.value;
-    let mediaDirFiles = document.querySelectorAll(".media-dir-files");
-    mediaDirFiles.forEach((element) => {
-        element.style.columnCount = setting_cols;
-    });
+    slider_label.innerHTML = slider.value;
+    document.documentElement.style.setProperty(
+        "--media-grid-columns",
+        slider.value
+    );
 }
 function slider_left() {
     slider.value = Math.max(
@@ -42,7 +39,7 @@ function slider_right() {
     );
     slider_update();
 }
-slider.value = setting_cols;
+slider.value = default_setting_cols;
 slider.oninput = slider_update;
 slider.addEventListener("wheel", function (event) {
     if (event.deltaY < 0) {
@@ -79,7 +76,7 @@ window.addEventListener("wheel", (event) => {
 document.addEventListener("keydown", (event) => {
     switch (event.key) {
         case "p":
-            hoverZoom_check();
+            hoverZoom_toggle();
             break;
         case "ArrowLeft":
             slider_left();

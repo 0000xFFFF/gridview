@@ -2,6 +2,7 @@
     --main-color-background: #101010;
     --main-color-orange: #e5b567;
     --main-color-white: #d6d6d6;
+    --media-grid-columns: 6;
 }
 
 body {
@@ -54,13 +55,13 @@ h1 {
 }
 
 .media-dir-files {
-    column-count: 6; /* Number of columns, adjust as needed */
-    column-gap: 5px; /* Space between the columns */
+    column-count: var(--media-grid-columns);
+    column-gap: 5px;
 }
 
 .media-file {
     display: inline-block;
-    margin-bottom: 5px; /* Space between items */
+    margin-bottom: 5px;
     width: 100%;
     contain: content;
     will-change: transform;
