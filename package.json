@@ -1,6 +1,6 @@
 {
   "name": "gridview",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "masonry grid layout image viewer",
   "author": "0000xFFFF",
   "main": "src/index.js",

@@ -1,7 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Name=gridview
-Exec=/usr/local/bin/gridview
-Icon=gridview
-Type=Application
-Terminal=false

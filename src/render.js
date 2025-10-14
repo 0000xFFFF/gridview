@@ -30,7 +30,6 @@ function isNearViewport(el) {
 }
 
 function addFileInfo(div_file, file) {
-    const zoomCb = document.getElementById("setting_cb_hoverZoom");
 
     const div_file_info = document.createElement("span");
     div_file_info.className = "media-file-info";
@@ -308,6 +307,8 @@ function setupHoverPreview(
     let lastVolume = 1.0;
     let mainVideo = null;
 
+    const zoomCb = document.getElementById("setting_cb_hoverZoom");
+
     const updatePreviewPosition = (e) => {
         if (!previewOverlay) return;
 
@@ -366,15 +367,20 @@ function setupHoverPreview(
                 previewVideo.autoplay = true;
                 previewVideo.volume = lastVolume;
 
-                previewVideo.addEventListener("wheel", (e) => {
-                    e.preventDefault();
-                    const delta = e.deltaY * -0.01;
-                    lastVolume = Math.max(
-                        0,
-                        Math.min(1, previewVideo.volume + delta)
-                    );
-                    previewVideo.volume = lastVolume;
-                });
+                // Mouse wheel volume control
+                mediaWrapper.addEventListener(
+                    "wheel",
+                    (e) => {
+                        if (zoomCb.checked) {
+                            e.preventDefault();
+                            const delta = -e.deltaY * 0.0005;
+                            const newVolume = Math.min(1, Math.max(0, previewVideo.volume + delta));
+                            previewVideo.volume = newVolume;
+                            lastVolume = newVolume;
+                        }
+                    },
+                    { passive: false } // Important to make preventDefault() work
+                );
 
                 if (mainVideo) {
                     previewVideo.currentTime = mainVideo.currentTime;
