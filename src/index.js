@@ -15,10 +15,13 @@ const sizeOf = require("image-size").default || require("image-size");
 const thumbDir = path.join(app.getPath("userData"), "thumbs");
 let mainWindow;
 
-// Handle command line arguments
+console.log(process.argv);
+
+// Determine how many args to skip
+const skipCount = app.isPackaged ? 1 : 2;
+
 const startupDir = process.argv.find((arg, index) => {
-    // Skip the first two arguments (electron and script path)
-    if (index <= 1) return false;
+    if (index < skipCount) return false;
     return fs.existsSync(arg) && fs.statSync(arg).isDirectory();
 });
 
@@ -44,6 +47,7 @@ app.whenReady().then(async () => {
 
     // If directory was provided in arguments, load it
     if (startupDir) {
+        console.log("startup dir: ", startupDir);
         const directories = await loadDir(startupDir);
         mainWindow.webContents.send("selected-directory", directories);
     }
