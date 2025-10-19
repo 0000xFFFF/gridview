@@ -305,7 +305,6 @@ function setupHoverPreview(
 ) {
     let previewOverlay = null;
     let lastVolume = 1.0;
-    let mainVideo = null;
 
     const zoomCb = document.getElementById("setting_cb_hoverZoom");
 
@@ -358,7 +357,7 @@ function setupHoverPreview(
             previewOverlay.className = "fcm_hover_preview";
 
             if (isVideo) {
-                mainVideo = mediaWrapper.querySelector("video");
+                const mainVideo = mediaWrapper.querySelector("video");
                 const previewVideo = document.createElement("video");
                 previewVideo.src = `file://${mediaData.path}`;
                 previewVideo.loop = true;
@@ -366,6 +365,8 @@ function setupHoverPreview(
                 previewVideo.controls = false;
                 previewVideo.autoplay = true;
                 previewVideo.volume = lastVolume;
+
+                previewVideo.addEventListener("loadeddata", (event) => { updatePreviewPosition(e); });
 
                 // Mouse wheel volume control
                 mediaWrapper.addEventListener(
@@ -382,10 +383,13 @@ function setupHoverPreview(
                     { passive: false } // Important to make preventDefault() work
                 );
 
+                // Sync with main video if it exists and is playing
                 if (mainVideo) {
                     previewVideo.currentTime = mainVideo.currentTime;
                     previewVideo.muted = false;
                     mainVideo.muted = true;
+                } else {
+                    previewVideo.muted = false;
                 }
 
                 previewOverlay.appendChild(previewVideo);
@@ -393,6 +397,7 @@ function setupHoverPreview(
                 const previewImg = document.createElement("img");
                 previewImg.src = `file://${mediaData.path}`;
                 previewOverlay.appendChild(previewImg);
+                previewImg.addEventListener("loadeddata", (event) => { updatePreviewPosition(e); });
             }
 
             // const previewInfo = document.createElement("div");
@@ -402,6 +407,7 @@ function setupHoverPreview(
 
             document.body.appendChild(previewOverlay);
         }
+
         if (previewOverlay) {
             previewOverlay.classList.add("active");
             updatePreviewPosition(e);
@@ -412,9 +418,6 @@ function setupHoverPreview(
         if (previewOverlay) {
             previewOverlay.remove();
             previewOverlay = null;
-            if (mainVideo) {
-                mainVideo.muted = false;
-            }
         }
     };
 
