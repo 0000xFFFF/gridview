@@ -8,9 +8,9 @@ function isElementInViewport(el) {
         rect.top >= 0 &&
         rect.left >= 0 &&
         rect.bottom <=
-        (window.innerHeight || document.documentElement.clientHeight) &&
+            (window.innerHeight || document.documentElement.clientHeight) &&
         rect.right <=
-        (window.innerWidth || document.documentElement.clientWidth)
+            (window.innerWidth || document.documentElement.clientWidth)
     );
 }
 
@@ -19,18 +19,17 @@ function isNearViewport(el) {
     const buffer = 1080 * 2; // pixels
     return (
         rect.top <
-        (window.innerHeight || document.documentElement.clientHeight) +
-        buffer &&
+            (window.innerHeight || document.documentElement.clientHeight) +
+                buffer &&
         rect.bottom > -buffer &&
         rect.left <
-        (window.innerWidth || document.documentElement.clientWidth) +
-        buffer &&
+            (window.innerWidth || document.documentElement.clientWidth) +
+                buffer &&
         rect.right > -buffer
     );
 }
 
 function addFileInfo(div_file, file) {
-
     const div_file_info = document.createElement("span");
     div_file_info.className = "media-file-info";
     const div_file_info_name = document.createElement("a");
@@ -47,12 +46,12 @@ function addFileInfo(div_file, file) {
         }
     });
     div_file_info.appendChild(div_file_info_name);
-    div_file.addEventListener("mouseover", function() {
+    div_file.addEventListener("mouseover", function () {
         div_file_info.style.display = "block";
         div_file_info.style.opacity = "1"; // Make it visible
         document.title = `GridView - ${file.name}`;
     });
-    div_file.addEventListener("mouseleave", function() {
+    div_file.addEventListener("mouseleave", function () {
         div_file_info.style.opacity = "0"; // Hide with transition
         setTimeout(() => {
             div_file_info.style.display = "none"; // Hide after transition
@@ -77,9 +76,16 @@ const videoObserver = new IntersectionObserver(
                     thumbImg.dataset.loading = "true";
                     window.electronAPI
                         .generateVideoThumbnail(videoPath)
-                        .then((thumbPath) => {
+                        .then(async (thumbPath) => {
                             if (thumbPath) {
-                                thumbImg.src = `file://${thumbPath}`;
+                                // Get thumbnail data as base64
+                                const thumbData =
+                                    await window.electronAPI.getThumbnailData(
+                                        thumbPath
+                                    );
+                                if (thumbData.success) {
+                                    thumbImg.src = `data:${thumbData.mimeType};base64,${thumbData.data}`;
+                                }
                             } else {
                                 // Maybe set a "no thumbnail" image
                             }
@@ -102,7 +108,7 @@ const videoObserver = new IntersectionObserver(
 
 function addChildImage(div_file, file, div_file_info) {
     const img = document.createElement("img");
-    img.src = file.path;
+    img.src = `file://${file.path}`;
     img.loading = "eager";
     img.decoding = "async";
     img.className = "media-file-img";
@@ -207,7 +213,9 @@ function loadNextDirectory() {
         return;
     }
 
-    if (currentDirIndex >= allDirectories.length) { return; }
+    if (currentDirIndex >= allDirectories.length) {
+        return;
+    }
 
     isLoadingMore = true;
 
@@ -232,7 +240,7 @@ function renderDirectory(dir, index, total) {
     const div_dir_head = document.createElement("div");
     div_dir_head.className = "media-dir-head";
     const h1 = document.createElement("h1");
-    h1.textContent = dir.path;
+    h1.textContent = dir.name;
     div_dir_head.appendChild(h1);
 
     const dirInfo = document.createElement("span");
@@ -357,7 +365,9 @@ function setupHoverPreview(
                 previewVideo.autoplay = true;
                 previewVideo.volume = lastVolume;
 
-                previewVideo.addEventListener("loadeddata", (event) => { updatePreviewPosition(e); });
+                previewVideo.addEventListener("loadeddata", (event) => {
+                    updatePreviewPosition(e);
+                });
 
                 // Mouse wheel volume control
                 mediaWrapper.addEventListener(
@@ -366,7 +376,10 @@ function setupHoverPreview(
                         if (zoomCb.checked) {
                             e.preventDefault();
                             const delta = -e.deltaY * 0.0005;
-                            const newVolume = Math.min(1, Math.max(0, previewVideo.volume + delta));
+                            const newVolume = Math.min(
+                                1,
+                                Math.max(0, previewVideo.volume + delta)
+                            );
                             previewVideo.volume = newVolume;
                             lastVolume = newVolume;
                         }
@@ -388,7 +401,9 @@ function setupHoverPreview(
                 const previewImg = document.createElement("img");
                 previewImg.src = `file://${mediaData.path}`;
                 previewOverlay.appendChild(previewImg);
-                previewImg.addEventListener("loadeddata", (event) => { updatePreviewPosition(e); });
+                previewImg.addEventListener("loadeddata", (event) => {
+                    updatePreviewPosition(e);
+                });
             }
 
             // const previewInfo = document.createElement("div");

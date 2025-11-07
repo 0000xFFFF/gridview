@@ -182,7 +182,8 @@ async function getMediaDirectories(dirPath) {
             // Only add the root directory if it has media files
             if (mediaFiles.length > 0) {
                 directories.push({
-                    path: ".", // Represent the root directory as '.'
+                    path: dirPath,
+                    name: ".", // Represent the root directory as '.'
                     files: mediaFiles,
                 });
             }
@@ -204,7 +205,8 @@ async function processDirectories(files, basePath, currentPath, directories) {
             if (subMediaFiles.length > 0) {
                 // Only add if not empty
                 directories.push({
-                    path: fullPath.replace(`${basePath}/`, ""), // Use relative path
+                    path: fullPath,
+                    name: fullPath.replace(`${basePath}/`, ""), // Use relative path for name
                     files: subMediaFiles,
                 });
             }
@@ -296,7 +298,6 @@ ipcMain.handle("generate-video-thumbnail", async (event, videoPath) => {
     const thumbPath = await generateVideoThumbnail(videoPath);
     return thumbPath;
 });
-
 app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
 });
