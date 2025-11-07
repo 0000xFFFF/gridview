@@ -20,10 +20,12 @@ console.log(process.argv);
 // Determine how many args to skip
 const skipCount = app.isPackaged ? 1 : 2;
 
-const startupDir = process.argv.find((arg, index) => {
+let startupDir = process.argv.find((arg, index) => {
     if (index < skipCount) return false;
     return fs.existsSync(arg) && fs.statSync(arg).isDirectory();
 });
+
+if (startupDir) startupDir = path.resolve(startupDir);
 
 app.whenReady().then(async () => {
     // WINDOW SETTINGS
