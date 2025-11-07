@@ -8,9 +8,9 @@ function isElementInViewport(el) {
         rect.top >= 0 &&
         rect.left >= 0 &&
         rect.bottom <=
-            (window.innerHeight || document.documentElement.clientHeight) &&
+        (window.innerHeight || document.documentElement.clientHeight) &&
         rect.right <=
-            (window.innerWidth || document.documentElement.clientWidth)
+        (window.innerWidth || document.documentElement.clientWidth)
     );
 }
 
@@ -19,12 +19,12 @@ function isNearViewport(el) {
     const buffer = 1080 * 2; // pixels
     return (
         rect.top <
-            (window.innerHeight || document.documentElement.clientHeight) +
-                buffer &&
+        (window.innerHeight || document.documentElement.clientHeight) +
+        buffer &&
         rect.bottom > -buffer &&
         rect.left <
-            (window.innerWidth || document.documentElement.clientWidth) +
-                buffer &&
+        (window.innerWidth || document.documentElement.clientWidth) +
+        buffer &&
         rect.right > -buffer
     );
 }
@@ -47,12 +47,12 @@ function addFileInfo(div_file, file) {
         }
     });
     div_file_info.appendChild(div_file_info_name);
-    div_file.addEventListener("mouseover", function () {
+    div_file.addEventListener("mouseover", function() {
         div_file_info.style.display = "block";
         div_file_info.style.opacity = "1"; // Make it visible
         document.title = `GridView - ${file.name}`;
     });
-    div_file.addEventListener("mouseleave", function () {
+    div_file.addEventListener("mouseleave", function() {
         div_file_info.style.opacity = "0"; // Hide with transition
         setTimeout(() => {
             div_file_info.style.display = "none"; // Hide after transition
@@ -207,25 +207,16 @@ function loadNextDirectory() {
         return;
     }
 
+    if (currentDirIndex >= allDirectories.length) { return; }
+
     isLoadingMore = true;
 
     // Render current directory
     renderDirectory(
         allDirectories[currentDirIndex],
-        currentDirIndex + 1,
+        currentDirIndex,
         allDirectories.length
     );
-
-    // Immediately render next directory if available
-    if (currentDirIndex + 1 < allDirectories.length) {
-        setTimeout(() => {
-            renderDirectory(
-                allDirectories[currentDirIndex + 1],
-                currentDirIndex + 2,
-                allDirectories.length
-            );
-        }, 100);
-    }
 
     currentDirIndex++;
 
