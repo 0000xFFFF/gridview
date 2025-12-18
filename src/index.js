@@ -300,6 +300,24 @@ ipcMain.handle("generate-video-thumbnail", async (event, videoPath) => {
     const thumbPath = await generateVideoThumbnail(videoPath);
     return thumbPath;
 });
+
+ipcMain.handle("get-thumbnail-data", async (event, thumbPath) => {
+    try {
+        if (fs.existsSync(thumbPath)) {
+            const data = fs.readFileSync(thumbPath);
+            return {
+                success: true,
+                data: data.toString("base64"),
+                mimeType: "image/jpeg",
+            };
+        }
+        return { success: false };
+    } catch (error) {
+        console.error("Error reading thumbnail:", error);
+        return { success: false };
+    }
+});
+
 app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
 });
