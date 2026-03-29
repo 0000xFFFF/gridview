@@ -1,0 +1,3 @@
+- switch to pnpm
+- update preview.gif
+- fix buggy drag n drop
