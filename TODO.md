@@ -1,3 +1,5 @@
+- make video thumbnails actual first frame of video (don't use really lowres)
+    - make the play button less visible -- lower opacity
 - switch to pnpm
 - update preview.gif
 - fix buggy drag n drop
