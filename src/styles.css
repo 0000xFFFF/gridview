@@ -1,22 +1,67 @@
+
+/* 
+
+RecMonoCasualNerdFontMono-Regular.ttf
+
+*/
+
+@font-face {
+    font-family: "RecMonoCasualNerdFontMono";
+    src: url("../assets/fonts/Recursive/RecMonoCasualNerdFontMono-Regular.ttf") format("truetype");
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+
+
 :root {
     --main-color-background: #101010;
     --main-color-orange: #e5b567;
     --main-color-white: #d6d6d6;
     --media-grid-columns: 6;
+    --font-main: "RecMonoCasualNerdFontMono", monospace;
+    --font-mono: "RecMonoCasualNerdFontMono", monospace;
 }
 
+html,
 body {
-    font-family: monospace;
+    font-family: var(--font-main);
     color: var(--main-color-white);
-    background-color: var(--main-color-background)
+    background-color: var(--main-color-background);
 }
 
-* {
+*,
+*::before,
+*::after {
+    font-family: var(--font-main);
     color: var(--main-color-orange);
 }
 
+code,
+pre,
+textarea,
+input,
+select {
+    font-family: var(--font-mono);
+}
+
 button {
+    cursor: pointer;
     background-color: transparent;
+    border: none;
+    padding: 2px;
+}
+
+.icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    line-height: 1;
+}
+
+.icon-button:hover {
+    border-color: var(--main-color-orange);
 }
 
 h1 {
@@ -121,6 +166,11 @@ h1 {
 }
 
 #topbar {
+    display: flex;
+    justify-content: flex-start;
+    padding: 3px;
+    align-items: center;
+    gap: 5px;
     position: fixed;
     top: 0;
     left: 0;

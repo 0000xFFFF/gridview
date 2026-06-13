@@ -17,7 +17,7 @@ mkdir -p ~/.local/share/applications
 # Generate the gridview.desktop file
 cat << EOF > ~/.local/share/applications/gridview.desktop
 [Desktop Entry]
-Version=1.3.2
+Version=1.4.0
 Name=GridView
 Exec=/usr/local/bin/gridview
 Icon=$full_icon_path
