@@ -14,6 +14,7 @@ const os = require("os");
 const sizeOf = require("image-size").default || require("image-size");
 const thumbDir = path.join(app.getPath("userData"), "thumbs");
 let mainWindow;
+let currentLoadedDirPath = null;
 
 console.log(process.argv);
 
@@ -37,7 +38,7 @@ app.whenReady().then(async () => {
             audio: true,
             zoomFactor: 1,
             preload: path.resolve(
-                path.join(app.getAppPath(), "src", "preload.js")
+                path.join(app.getAppPath(), "src", "preload.js"),
             ),
         },
         icon: path.join(app.getAppPath(), "assets", "icon.png"), // Set application icon
@@ -50,8 +51,7 @@ app.whenReady().then(async () => {
     // If directory was provided in arguments, load it
     if (startupDir) {
         console.log("startup dir: ", startupDir);
-        const directories = await loadDir(startupDir);
-        mainWindow.webContents.send("selected-directory", directories);
+        await sendLoadedDirectory(startupDir);
     }
 
     // MENU SETUP
@@ -99,7 +99,7 @@ async function generateVideoThumbnail(videoPath) {
 
         const thumbPath = path.join(
             thumbDir,
-            path.basename(videoPath) + ".jpg"
+            path.basename(videoPath) + ".jpg",
         );
 
         // Skip if thumbnail already exists
@@ -150,7 +150,7 @@ async function dims(imagePath) {
 async function selectDirectoryAndSend() {
     const selectedDir = await selectDirectory();
     if (selectedDir) {
-        mainWindow.webContents.send("selected-directory", selectedDir); // Send selected directory to renderer
+        await sendLoadedDirectory(selectedDir);
     }
 }
 
@@ -163,13 +163,23 @@ async function selectDirectory() {
     } // No directory was chosen
 
     const dirPath = result.filePaths[0];
-    return await loadDir(dirPath);
+    return path.resolve(dirPath);
 }
 
 async function loadDir(dirPath) {
     //console.log(`selected dir: ${dirPath}`);
-    mainWindow.setTitle(`GridView - ${dirPath}`);
-    return await getMediaDirectories(dirPath);
+    currentLoadedDirPath = path.resolve(dirPath);
+    mainWindow.setTitle(`GridView - ${currentLoadedDirPath}`);
+    return await getMediaDirectories(currentLoadedDirPath);
+}
+
+async function sendLoadedDirectory(dirPath) {
+    const directories = await loadDir(dirPath);
+    mainWindow.webContents.send("selected-directory", {
+        rootPath: currentLoadedDirPath,
+        directories,
+    });
+    return directories;
 }
 
 // Function to retrieve directories and files
@@ -292,8 +302,24 @@ ipcMain.on("open-file", (event, filePath) => {
     openFile(filePath);
 });
 ipcMain.on("drop-folder", async (event, dirPath) => {
-    const directories = await loadDir(dirPath);
-    mainWindow.webContents.send("selected-directory", directories);
+    await sendLoadedDirectory(dirPath);
+});
+
+ipcMain.handle("reload-current-directory", async () => {
+    if (!currentLoadedDirPath) {
+        return null;
+    }
+
+    const directories = await loadDir(currentLoadedDirPath);
+    mainWindow.webContents.send("selected-directory", {
+        rootPath: currentLoadedDirPath,
+        directories,
+    });
+
+    return {
+        rootPath: currentLoadedDirPath,
+        directories,
+    };
 });
 
 ipcMain.handle("generate-video-thumbnail", async (event, videoPath) => {

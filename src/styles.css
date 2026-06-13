@@ -15,6 +15,10 @@ body {
     color: var(--main-color-orange);
 }
 
+button {
+    background-color: transparent;
+}
+
 h1 {
     text-align: left;
     padding: 3px 3px 3px 10px;

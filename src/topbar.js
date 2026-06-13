@@ -22,20 +22,20 @@ function slider_update() {
     slider_label.innerHTML = slider.value;
     document.documentElement.style.setProperty(
         "--media-grid-columns",
-        slider.value
+        slider.value,
     );
 }
 function slider_left() {
     slider.value = Math.max(
         Number(slider.value) - Number(slider.step),
-        slider.min
+        slider.min,
     );
     slider_update();
 }
 function slider_right() {
     slider.value = Math.min(
         Number(slider.value) + Number(slider.step),
-        slider.max
+        slider.max,
     );
     slider_update();
 }
@@ -85,4 +85,19 @@ document.addEventListener("keydown", (event) => {
             slider_right();
             break;
     }
+});
+
+let btn_reload = document.getElementById("btn_reload");
+
+btn_reload.addEventListener("click", async () => {
+    await window.electronAPI.reloadCurrentDirectory();
+});
+
+let btn_muteall = document.getElementById("btn_muteall");
+
+btn_muteall.addEventListener("click", () => {
+    document.querySelectorAll("video").forEach((video) => {
+        video.muted = true;
+        video.volume = 0;
+    });
 });

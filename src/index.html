@@ -9,16 +9,19 @@
     </head>
     <body>
         <div id="topbar">
+            <button id="btn_reload">Reload</button>
+            <button id="btn_muteall">Mute all</button>
+
             <label class="checkboxContainer" title="Enable Zoom on Hover (P)">
                 <input id="setting_cb_hoverZoom" type="checkbox">
-                <span class="checkmark">
-                </span>
+                <span class="checkmark"></span>
             </label>
 
             <div class="sliderCont">
                 <input title="Columns (LEFT, RIGHT)" id="setting_slider_cols" type="range" min="1" max="20" step="1" class="slider">
                 <p id="setting_slider_cols_label" class="sliderLabel">...</p>
             </div>
+
         </div>
 
         <div id="media-dirs"></div>

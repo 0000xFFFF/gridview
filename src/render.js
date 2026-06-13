@@ -81,7 +81,7 @@ const videoObserver = new IntersectionObserver(
                                 // Get thumbnail data as base64
                                 const thumbData =
                                     await window.electronAPI.getThumbnailData(
-                                        thumbPath
+                                        thumbPath,
                                     );
                                 if (thumbData.success) {
                                     thumbImg.src = `data:${thumbData.mimeType};base64,${thumbData.data}`;
@@ -103,7 +103,7 @@ const videoObserver = new IntersectionObserver(
     },
     {
         rootMargin: "200px",
-    }
+    },
 );
 
 function addChildImage(div_file, file, div_file_info) {
@@ -180,7 +180,7 @@ function createFile(file) {
         file.name.endsWith(".gif")
     ) {
         return addChildImage(div_file, file, div_file_info).then(
-            () => div_file
+            () => div_file,
         ); // Return a promise that resolves to the div_file
     } else if (
         file.name.endsWith(".mp4") ||
@@ -189,7 +189,7 @@ function createFile(file) {
         file.name.endsWith(".avi")
     ) {
         return addChildVideo(div_file, file, div_file_info).then(
-            () => div_file
+            () => div_file,
         ); // Return a promise that resolves to the div_file
     }
     return Promise.resolve(div_file); // Return the div_file if no async media loading is required
@@ -223,7 +223,7 @@ function loadNextDirectory() {
     renderDirectory(
         allDirectories[currentDirIndex],
         currentDirIndex,
-        allDirectories.length
+        allDirectories.length,
     );
 
     currentDirIndex++;
@@ -265,7 +265,13 @@ function renderDirectory(dir, index, total) {
 }
 
 // Replace the existing onSelectedDirectory handler with this one
-window.electronAPI.onSelectedDirectory(async (event, directories) => {
+window.electronAPI.onSelectedDirectory(async (event, payload) => {
+    const directories = Array.isArray(payload) ? payload : payload.directories;
+    window.currentLoadedDirPath = Array.isArray(payload)
+        ? (directories[0]?.path ?? null)
+        : (payload.rootPath ?? null);
+    window.currentLoadedDirectories = directories;
+
     const div_dirs = document.getElementById("media-dirs");
     div_dirs.innerHTML = ""; // Clear existing content
     div_dirs.appendChild(footer); // Re-add footer after clearing
@@ -300,7 +306,7 @@ function setupHoverPreview(
     mediaWrapper,
     mediaData,
     thumbnailImg,
-    isVideo = false
+    isVideo = false,
 ) {
     let previewOverlay = null;
     let lastVolume = 1.0;
@@ -312,7 +318,7 @@ function setupHoverPreview(
 
         const mediaElement = previewOverlay.querySelector("img, video");
         const infoElement = previewOverlay.querySelector(
-            ".fcm_hover_preview_info"
+            ".fcm_hover_preview_info",
         );
 
         if (mediaElement) {
@@ -343,7 +349,7 @@ function setupHoverPreview(
     };
 
     const setting_cb_hoverZoom = document.getElementById(
-        "setting_cb_hoverZoom"
+        "setting_cb_hoverZoom",
     );
 
     const showPreview = (e) => {
@@ -378,13 +384,13 @@ function setupHoverPreview(
                             const delta = -e.deltaY * 0.0005;
                             const newVolume = Math.min(
                                 1,
-                                Math.max(0, previewVideo.volume + delta)
+                                Math.max(0, previewVideo.volume + delta),
                             );
                             previewVideo.volume = newVolume;
                             lastVolume = newVolume;
                         }
                     },
-                    { passive: false } // Important to make preventDefault() work
+                    { passive: false }, // Important to make preventDefault() work
                 );
 
                 // Sync with main video if it exists and is playing

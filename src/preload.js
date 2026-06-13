@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     onSelectedDirectory: (callback) =>
         ipcRenderer.on("selected-directory", callback),
     setZoomFactor: (factor) => webFrame.setZoomFactor(factor),
+    reloadCurrentDirectory: () =>
+        ipcRenderer.invoke("reload-current-directory"),
     generateVideoThumbnail: (videoPath) =>
         ipcRenderer.invoke("generate-video-thumbnail", videoPath),
     getThumbnailData: (thumbPath) =>
