@@ -108,7 +108,7 @@ async function generateVideoThumbnail(videoPath) {
         }
 
         // Generate thumbnail with ffmpeg
-        const cmd = `ffmpeg -i "${videoPath}" -ss 00:00:01 -vframes 1 -vf scale=160:-1 -q:v 31 "${thumbPath}" -y`;
+        const cmd = `ffmpeg -i "${videoPath}" -frames:v 1 -q:v 2 "${thumbPath}" -y`;
 
         exec(cmd, (err) => {
             if (err) {
