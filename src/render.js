@@ -38,10 +38,10 @@ function addFileInfo(div_file, file) {
     div_file_info_name.addEventListener("mouseup", (event) => {
         switch (event.button) {
             case 1:
-                ipcRenderer.send("open-file", file.path);
+                window.electronAPI.openFile(file.path);
                 break;
             case 2:
-                ipcRenderer.send("select-file", file.path);
+                window.electronAPI.selectFile(file.path);
                 break;
         }
     });

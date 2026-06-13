@@ -3,10 +3,12 @@ const { contextBridge, ipcRenderer, webFrame } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
-contextBridge.exposeInMainWorld("ipcRenderer", ipcRenderer);
 contextBridge.exposeInMainWorld("fs", fs);
 contextBridge.exposeInMainWorld("path", path);
 contextBridge.exposeInMainWorld("electronAPI", {
+    openFile: (filePath) => ipcRenderer.send("open-file", filePath),
+    selectFile: (filePath) => ipcRenderer.send("select-file", filePath),
+    dropFolder: (dirPath) => ipcRenderer.send("drop-folder", dirPath),
     onSelectedDirectory: (callback) =>
         ipcRenderer.on("selected-directory", callback),
     setZoomFactor: (factor) => webFrame.setZoomFactor(factor),

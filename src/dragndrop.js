@@ -29,7 +29,7 @@ mediaDirs.addEventListener("drop", (event) => {
     for (let i = 0; i < files.length; i++) {
         const currentFile = files[i];
         if (!currentFile.type && currentFile.size % 4096 == 0) {
-            ipcRenderer.send("drop-folder", currentFile.path);
+            window.electronAPI.dropFolder(currentFile.path);
             break;
         }
     }
