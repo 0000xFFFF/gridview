@@ -18,8 +18,8 @@
     }
   },
   "devDependencies": {
-    "@electron/packager": "18.3.5",
-    "electron": "26.6.10"
+    "@electron/packager": "20.0.1",
+    "electron": "42.4.0"
   },
   "keywords": [],
   "license": "ISC",
