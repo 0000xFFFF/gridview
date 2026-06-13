@@ -1,4 +1,3 @@
-- make the play button less visible -- lower opacity
+- fix drag n drop
 - switch to pnpm
 - update preview.gif
-- fix buggy drag n drop
