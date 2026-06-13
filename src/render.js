@@ -151,9 +151,9 @@ function addChildVideo(div_file, file, div_file_info) {
             const video = document.createElement("video");
             video.src = `file://${file.path}`;
             video.controls = true;
-            video.autoplay = false;
-            video.loop = false;
-            video.muted = true;
+            video.autoplay = true;
+            video.loop = true;
+            video.muted = false;
             div_file.innerHTML = ""; // Clear thumbnail + button
             div_file.appendChild(video);
         });
