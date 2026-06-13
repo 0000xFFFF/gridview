@@ -28,7 +28,11 @@ mediaDirs.addEventListener("drop", (event) => {
     const files = event.dataTransfer.files;
     for (let i = 0; i < files.length; i++) {
         const currentFile = files[i];
-        if (!currentFile.type && currentFile.size % 4096 == 0) {
+        if (
+            !currentFile.type &&
+            currentFile.size % 4096 == 0 &&
+            typeof currentFile.path === "string"
+        ) {
             window.electronAPI.dropFolder(currentFile.path);
             break;
         }

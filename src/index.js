@@ -168,12 +168,23 @@ async function selectDirectory() {
 
 async function loadDir(dirPath) {
     //console.log(`selected dir: ${dirPath}`);
+    if (typeof dirPath !== "string" || !dirPath.trim()) {
+        throw new TypeError(`Invalid directory path: ${dirPath}`);
+    }
     currentLoadedDirPath = path.resolve(dirPath);
     mainWindow.setTitle(`GridView - ${currentLoadedDirPath}`);
     return await getMediaDirectories(currentLoadedDirPath);
 }
 
 async function sendLoadedDirectory(dirPath) {
+    if (typeof dirPath !== "string" || !dirPath.trim()) {
+        console.warn(
+            "Skipping directory load because the path is invalid:",
+            dirPath,
+        );
+        return null;
+    }
+
     const directories = await loadDir(dirPath);
     mainWindow.webContents.send("selected-directory", {
         rootPath: currentLoadedDirPath,
