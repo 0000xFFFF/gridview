@@ -249,6 +249,7 @@ input[type='range']::-webkit-slider-thumb {
     font-size: 24px;
     color: white;
     pointer-events: none; /* Click passes to thumbnail */
+    opacity: 0.3;
 }
 
 .fcm_hover_preview {
