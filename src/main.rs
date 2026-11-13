@@ -5,8 +5,8 @@ mod video;
 
 use chrono::{Datelike, Local, TimeZone};
 use eframe::egui::{
-    self, Align2, Color32, FontId, Id, Key, Pos2, Rect, Sense, Stroke, TextureHandle, TextureOptions,
-    pos2, vec2,
+    self, pos2, vec2, Align2, Color32, FontId, Id, Key, Pos2, Rect, Sense, Stroke, TextureHandle,
+    TextureOptions,
 };
 use layout::{Group, Layout, HEADER_H};
 use scan::{Item, Kind, ScanHandle, ScanMsg};
@@ -18,6 +18,13 @@ use std::time::{Duration, Instant};
 use thumbs::{Req, Thumbs};
 
 const TEX_BUDGET_BYTES: usize = 400 * 1024 * 1024;
+
+const APP_NAME: &str = "gridview";
+const SLIDER_COLUMNS_DEFAULT: usize = 12;
+const SLIDER_COLUMNS_MIN: usize = 1;
+const SLIDER_COLUMNS_MAX: usize = 200;
+const WINDOW_WIDTH: f32 = 1280.0;
+const WINDOW_HEIGHT: f32 = 800.0;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum GroupMode {
@@ -98,7 +105,10 @@ fn open_external(path: &Path) {
     #[cfg(target_os = "macos")]
     let _ = Command::new("open").arg(path).spawn();
     #[cfg(target_os = "windows")]
-    let _ = Command::new("cmd").args(["/C", "start", ""]).arg(path).spawn();
+    let _ = Command::new("cmd")
+        .args(["/C", "start", ""])
+        .arg(path)
+        .spawn();
 }
 
 impl App {
@@ -115,7 +125,7 @@ impl App {
             scan: None,
             scanning: false,
             dims_done: 0,
-            columns: 5,
+            columns: SLIDER_COLUMNS_DEFAULT,
             gap: 4.0,
             group_mode: GroupMode::Folder,
             gran: DateGran::Day,
@@ -194,7 +204,11 @@ impl App {
     fn rebuild_groups(&mut self) {
         self.groups_dirty = false;
         self.groups = build_groups(&self.items, self.group_mode, self.gran, &self.root);
-        self.order = self.groups.iter().flat_map(|g| g.ids.iter().copied()).collect();
+        self.order = self
+            .groups
+            .iter()
+            .flat_map(|g| g.ids.iter().copied())
+            .collect();
         self.order_pos = vec![0; self.items.len()];
         for (i, id) in self.order.iter().enumerate() {
             self.order_pos[*id as usize] = i as u32;
@@ -238,7 +252,14 @@ impl App {
                     let ci = egui::ColorImage::from_rgb([w as usize, h as usize], img.as_raw());
                     let handle = ctx.load_texture(format!("t{}", d.id), ci, TextureOptions::LINEAR);
                     let bytes = (w * h * 4) as usize;
-                    if let Some(old) = self.tex.insert(d.id, Tex { handle, tier: d.tier, bytes }) {
+                    if let Some(old) = self.tex.insert(
+                        d.id,
+                        Tex {
+                            handle,
+                            tier: d.tier,
+                            bytes,
+                        },
+                    ) {
                         self.tex_bytes -= old.bytes;
                     }
                     self.tex_bytes += bytes;
@@ -289,7 +310,10 @@ impl App {
         let c = ctx.clone();
         std::thread::spawn(move || {
             let ci = thumbs::make_image(&path, kind, edge).map(|img| {
-                egui::ColorImage::from_rgb([img.width() as usize, img.height() as usize], img.as_raw())
+                egui::ColorImage::from_rgb(
+                    [img.width() as usize, img.height() as usize],
+                    img.as_raw(),
+                )
             });
             let _ = tx.send(ci);
             c.request_repaint();
@@ -332,9 +356,20 @@ impl App {
                     let avail = screen.shrink(24.0).size();
                     let s = (avail.x / ts.x).min(avail.y / ts.y);
                     let r = Rect::from_center_size(screen.center(), ts * s);
-                    p.image(t.id(), r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+                    p.image(
+                        t.id(),
+                        r,
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
                 } else {
-                    p.text(screen.center(), Align2::CENTER_CENTER, "Loading…", FontId::proportional(18.0), Color32::GRAY);
+                    p.text(
+                        screen.center(),
+                        Align2::CENTER_CENTER,
+                        "Loading…",
+                        FontId::proportional(18.0),
+                        Color32::GRAY,
+                    );
                 }
                 let name = self.items[id as usize].path.to_string_lossy().into_owned();
                 p.text(
@@ -424,7 +459,8 @@ impl App {
     fn paint_grid(&mut self, ui: &mut egui::Ui, viewport: Rect, outer: f32, ppp: f32) {
         let inner_w = ui.available_width();
         self.bar_reserve = (outer - inner_w).max(0.0);
-        let (area, _) = ui.allocate_exact_size(vec2(inner_w, self.layout.total_h.max(1.0)), Sense::hover());
+        let (area, _) =
+            ui.allocate_exact_size(vec2(inner_w, self.layout.total_h.max(1.0)), Sense::hover());
         let origin = area.min;
         let (top, bot) = (viewport.min.y, viewport.max.y);
         let vh = viewport.height();
@@ -452,7 +488,8 @@ impl App {
                 } else {
                     0.0
                 };
-                let behind = (p.y + p.h < top && self.scroll_dir >= 0.0) || (p.y > bot && self.scroll_dir < 0.0);
+                let behind = (p.y + p.h < top && self.scroll_dir >= 0.0)
+                    || (p.y > bot && self.scroll_dir < 0.0);
                 if behind {
                     dist *= 2.0;
                 }
@@ -460,7 +497,14 @@ impl App {
                 wanted.push((
                     dist,
                     p.y,
-                    Req { id: p.id, path: it.path.clone(), kind: it.kind, tier, mtime: it.modified, size: it.size },
+                    Req {
+                        id: p.id,
+                        path: it.path.clone(),
+                        kind: it.kind,
+                        tier,
+                        mtime: it.modified,
+                        size: it.size,
+                    },
                 ));
             }
         });
@@ -469,14 +513,21 @@ impl App {
         let key: Vec<(u32, u32)> = wanted.iter().map(|w| (w.2.id, w.2.tier)).collect();
         if key != self.last_wanted {
             self.last_wanted = key;
-            self.thumbs.set_wanted(wanted.into_iter().map(|w| w.2).collect());
+            self.thumbs
+                .set_wanted(wanted.into_iter().map(|w| w.2).collect());
         }
 
         // headers
         for h in self.layout.visible_headers(top, bot) {
             let y = origin.y + h.y;
             let mid = pos2(origin.x + 12.0, y + HEADER_H * 0.5 + 2.0);
-            let g = painter.text(mid, Align2::LEFT_CENTER, &h.label, FontId::proportional(19.0), Color32::from_gray(235));
+            let g = painter.text(
+                mid,
+                Align2::LEFT_CENTER,
+                &h.label,
+                FontId::proportional(19.0),
+                Color32::from_gray(235),
+            );
             painter.text(
                 pos2(g.max.x + 10.0, mid.y + 1.0),
                 Align2::LEFT_CENTER,
@@ -506,10 +557,19 @@ impl App {
                         Rect::from_min_max(pos2(0.0, (1.0 - h) / 2.0), pos2(1.0, (1.0 + h) / 2.0))
                     };
                     let a = ctx.animate_bool_with_time(Id::new(("fade", id)), true, 0.18);
-                    painter.image(t.handle.id(), r, uv, Color32::from_white_alpha((a * 255.0) as u8));
+                    painter.image(
+                        t.handle.id(),
+                        r,
+                        uv,
+                        Color32::from_white_alpha((a * 255.0) as u8),
+                    );
                 }
                 None => {
-                    let bg = if self.failed.contains(&id) { Color32::from_rgb(48, 24, 24) } else { Color32::from_gray(30) };
+                    let bg = if self.failed.contains(&id) {
+                        Color32::from_rgb(48, 24, 24)
+                    } else {
+                        Color32::from_gray(30)
+                    };
                     painter.rect_filled(r, 0.0, bg);
                 }
             }
@@ -523,7 +583,11 @@ impl App {
                 clicked = Some(id);
             }
             if pointer.map_or(false, |p| r.contains(p)) {
-                painter.rect_stroke(r, 0.0, Stroke::new(2.0_f32, Color32::from_rgb(90, 160, 255)));
+                painter.rect_stroke(
+                    r,
+                    0.0,
+                    Stroke::new(2.0_f32, Color32::from_rgb(90, 160, 255)),
+                );
             }
         }
         if let Some(id) = clicked {
@@ -534,7 +598,11 @@ impl App {
 
 fn draw_play(p: &egui::Painter, c: Pos2, s: f32) {
     p.add(egui::Shape::convex_polygon(
-        vec![pos2(c.x - s * 0.5, c.y - s * 0.7), pos2(c.x - s * 0.5, c.y + s * 0.7), pos2(c.x + s * 0.8, c.y)],
+        vec![
+            pos2(c.x - s * 0.5, c.y - s * 0.7),
+            pos2(c.x - s * 0.5, c.y + s * 0.7),
+            pos2(c.x + s * 0.8, c.y),
+        ],
         Color32::from_white_alpha(230),
         Stroke::NONE,
     ));
@@ -545,14 +613,23 @@ fn build_groups(items: &[Item], mode: GroupMode, gran: DateGran, root: &Path) ->
         GroupMode::Folder => {
             let mut m: BTreeMap<PathBuf, Vec<u32>> = BTreeMap::new();
             for (i, it) in items.iter().enumerate() {
-                m.entry(it.path.parent().unwrap_or(Path::new("")).to_path_buf()).or_default().push(i as u32);
+                m.entry(it.path.parent().unwrap_or(Path::new("")).to_path_buf())
+                    .or_default()
+                    .push(i as u32);
             }
             m.into_iter()
                 .map(|(dir, mut ids)| {
-                    ids.sort_by_cached_key(|&i| items[i as usize].path.file_name().map(|n| n.to_string_lossy().to_lowercase()));
+                    ids.sort_by_cached_key(|&i| {
+                        items[i as usize]
+                            .path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_lowercase())
+                    });
                     let rel = dir.strip_prefix(root).unwrap_or(&dir);
                     let label = if rel.as_os_str().is_empty() {
-                        root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| root.to_string_lossy().into_owned())
+                        root.file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| root.to_string_lossy().into_owned())
                     } else {
                         rel.to_string_lossy().into_owned()
                     };
@@ -561,15 +638,32 @@ fn build_groups(items: &[Item], mode: GroupMode, gran: DateGran, root: &Path) ->
                 .collect()
         }
         GroupMode::Modified | GroupMode::Created => {
-            let ts = |it: &Item| if mode == GroupMode::Modified { it.modified } else { it.created };
+            let ts = |it: &Item| {
+                if mode == GroupMode::Modified {
+                    it.modified
+                } else {
+                    it.created
+                }
+            };
             let mut m: BTreeMap<i32, (String, Vec<u32>)> = BTreeMap::new();
             for (i, it) in items.iter().enumerate() {
-                let Some(dt) = Local.timestamp_opt(ts(it), 0).single() else { continue };
-                let (key, label) = match gran {
-                    DateGran::Day => (dt.year() * 10000 + dt.month() as i32 * 100 + dt.day() as i32, dt.format("%a, %b %-d, %Y").to_string()),
-                    DateGran::Month => (dt.year() * 100 + dt.month() as i32, dt.format("%B %Y").to_string()),
+                let Some(dt) = Local.timestamp_opt(ts(it), 0).single() else {
+                    continue;
                 };
-                m.entry(key).or_insert_with(|| (label, vec![])).1.push(i as u32);
+                let (key, label) = match gran {
+                    DateGran::Day => (
+                        dt.year() * 10000 + dt.month() as i32 * 100 + dt.day() as i32,
+                        dt.format("%a, %b %-d, %Y").to_string(),
+                    ),
+                    DateGran::Month => (
+                        dt.year() * 100 + dt.month() as i32,
+                        dt.format("%B %Y").to_string(),
+                    ),
+                };
+                m.entry(key)
+                    .or_insert_with(|| (label, vec![]))
+                    .1
+                    .push(i as u32);
             }
             m.into_values()
                 .rev()
@@ -589,7 +683,11 @@ impl eframe::App for App {
 
         // drag & drop a folder onto the window
         if let Some(p) = ctx.input(|i| i.raw.dropped_files.first().and_then(|f| f.path.clone())) {
-            let dir = if p.is_dir() { p } else { p.parent().map(|x| x.to_path_buf()).unwrap_or(p) };
+            let dir = if p.is_dir() {
+                p
+            } else {
+                p.parent().map(|x| x.to_path_buf()).unwrap_or(p)
+            };
             self.open_dir(dir, ctx);
         }
         // pinch / ctrl+scroll changes column count
@@ -600,7 +698,7 @@ impl eframe::App for App {
                 self.columns = (self.columns.max(2) - 1).max(1);
                 self.zoom_acc = 1.0;
             } else if self.zoom_acc < 0.83 {
-                self.columns = (self.columns + 1).min(12);
+                self.columns = (self.columns + 1).min(SLIDER_COLUMNS_MAX);
                 self.zoom_acc = 1.0;
             }
         }
@@ -608,8 +706,10 @@ impl eframe::App for App {
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                let te = ui.add(egui::TextEdit::singleline(&mut self.path_input).desired_width(340.0));
-                let go = (te.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter))) || ui.button("Open").clicked();
+                let te =
+                    ui.add(egui::TextEdit::singleline(&mut self.path_input).desired_width(340.0));
+                let go = (te.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)))
+                    || ui.button("Open").clicked();
                 if go {
                     let p = PathBuf::from(self.path_input.trim());
                     if p.is_dir() {
@@ -618,20 +718,36 @@ impl eframe::App for App {
                 }
                 ui.separator();
                 ui.label("Columns");
-                ui.add(egui::Slider::new(&mut self.columns, 1..=12));
+                ui.spacing_mut().slider_width = 500.0;
+                ui.add(egui::Slider::new(
+                    &mut self.columns,
+                    SLIDER_COLUMNS_MIN..=SLIDER_COLUMNS_MAX,
+                ));
                 ui.separator();
                 let mut changed = false;
-                egui::ComboBox::from_id_source("group").selected_text(self.group_mode.label()).show_ui(ui, |ui| {
-                    for m in [GroupMode::Folder, GroupMode::Modified, GroupMode::Created] {
-                        changed |= ui.selectable_value(&mut self.group_mode, m, m.label()).changed();
-                    }
-                });
+                egui::ComboBox::from_id_source("group")
+                    .selected_text(self.group_mode.label())
+                    .show_ui(ui, |ui| {
+                        for m in [GroupMode::Folder, GroupMode::Modified, GroupMode::Created] {
+                            changed |= ui
+                                .selectable_value(&mut self.group_mode, m, m.label())
+                                .changed();
+                        }
+                    });
                 if self.group_mode != GroupMode::Folder {
                     egui::ComboBox::from_id_source("gran")
-                        .selected_text(if self.gran == DateGran::Day { "Day" } else { "Month" })
+                        .selected_text(if self.gran == DateGran::Day {
+                            "Day"
+                        } else {
+                            "Month"
+                        })
                         .show_ui(ui, |ui| {
-                            changed |= ui.selectable_value(&mut self.gran, DateGran::Day, "Day").changed();
-                            changed |= ui.selectable_value(&mut self.gran, DateGran::Month, "Month").changed();
+                            changed |= ui
+                                .selectable_value(&mut self.gran, DateGran::Day, "Day")
+                                .changed();
+                            changed |= ui
+                                .selectable_value(&mut self.gran, DateGran::Month, "Month")
+                                .changed();
                         });
                 }
                 if changed {
@@ -642,13 +758,26 @@ impl eframe::App for App {
         });
 
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
-            let found = self.scan.as_ref().map_or(0, |s| s.found.load(Ordering::Relaxed));
+            let found = self
+                .scan
+                .as_ref()
+                .map_or(0, |s| s.found.load(Ordering::Relaxed));
             let txt = if self.items.is_empty() && self.scanning {
                 format!("Scanning… {found} files found")
             } else if self.scanning {
-                format!("{} items — reading sizes {}/{}", self.items.len(), self.dims_done, self.items.len())
+                format!(
+                    "{} items — reading sizes {}/{}",
+                    self.items.len(),
+                    self.dims_done,
+                    self.items.len()
+                )
             } else {
-                format!("{} items  •  {} textures in memory ({} MB)", self.items.len(), self.tex.len(), self.tex_bytes >> 20)
+                format!(
+                    "{} items  •  {} textures in memory ({} MB)",
+                    self.items.len(),
+                    self.tex.len(),
+                    self.tex_bytes >> 20
+                )
             };
             ui.label(txt);
         });
@@ -665,11 +794,15 @@ fn main() -> eframe::Result<()> {
     let root = std::env::args()
         .nth(1)
         .map(PathBuf::from)
-        .or_else(|| directories::UserDirs::new().and_then(|d| d.picture_dir().map(|p| p.to_path_buf())))
+        .or_else(|| {
+            directories::UserDirs::new().and_then(|d| d.picture_dir().map(|p| p.to_path_buf()))
+        })
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let opts = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([1300.0, 850.0]).with_title("gridview"),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([WINDOW_WIDTH, WINDOW_HEIGHT])
+            .with_title(APP_NAME),
         ..Default::default()
     };
-    eframe::run_native("gridview", opts, Box::new(|cc| Box::new(App::new(cc, root))))
+    eframe::run_native(APP_NAME, opts, Box::new(|cc| Box::new(App::new(cc, root))))
 }
