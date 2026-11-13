@@ -22,7 +22,7 @@ const TEX_BUDGET_BYTES: usize = 400 * 1024 * 1024;
 const APP_NAME: &str = "gridview";
 const SLIDER_COLUMNS_DEFAULT: usize = 12;
 const SLIDER_COLUMNS_MIN: usize = 1;
-const SLIDER_COLUMNS_MAX: usize = 200;
+const SLIDER_COLUMNS_MAX: usize = 45;
 const WINDOW_WIDTH: f32 = 1280.0;
 const WINDOW_HEIGHT: f32 = 800.0;
 
@@ -718,7 +718,6 @@ impl eframe::App for App {
                 }
                 ui.separator();
                 ui.label("Columns");
-                ui.spacing_mut().slider_width = 500.0;
                 ui.add(egui::Slider::new(
                     &mut self.columns,
                     SLIDER_COLUMNS_MIN..=SLIDER_COLUMNS_MAX,
