@@ -60,7 +60,11 @@ impl Layout {
                 continue;
             }
             if show_headers {
-                headers.push(Header { y: cursor, label: g.label.clone(), count: g.ids.len() });
+                headers.push(Header {
+                    y: cursor,
+                    label: g.label.clone(),
+                    count: g.ids.len(),
+                });
                 cursor += HEADER_H;
             }
             let mut col_h = vec![cursor; columns];
@@ -83,7 +87,17 @@ impl Layout {
             cursor = col_h.iter().cloned().fold(cursor, f32::max) + gap;
         }
 
-        Layout { width, columns, gap, col_w, cols, headers, y_of, h_of, total_h: cursor }
+        Layout {
+            width,
+            columns,
+            gap,
+            col_w,
+            cols,
+            headers,
+            y_of,
+            h_of,
+            total_h: cursor,
+        }
     }
 
     pub fn col_x(&self, c: usize) -> f32 {
@@ -131,13 +145,24 @@ mod tests {
     use std::path::PathBuf;
 
     fn item(w: u32, h: u32) -> Item {
-        Item { path: PathBuf::new(), kind: Kind::Image, modified: 0, created: 0, size: 0, w, h }
+        Item {
+            path: PathBuf::new(),
+            kind: Kind::Image,
+            modified: 0,
+            created: 0,
+            size: 0,
+            w,
+            h,
+        }
     }
 
     #[test]
     fn first_row_is_left_to_right() {
         let items: Vec<Item> = (0..10).map(|i| item(100 + i * 10, 100)).collect();
-        let groups = vec![Group { label: "g".into(), ids: (0..10).collect() }];
+        let groups = vec![Group {
+            label: "g".into(),
+            ids: (0..10).collect(),
+        }];
         let l = Layout::compute(&items, &groups, 1000.0, 4, 4.0, false);
         // first four items land in columns 0,1,2,3 in order, all at the same y
         for c in 0..4 {
@@ -148,8 +173,13 @@ mod tests {
 
     #[test]
     fn big_layout_is_fast_and_visibility_is_small() {
-        let items: Vec<Item> = (0..200_000).map(|i| item(100 + (i % 7) * 30, 100 + (i % 5) * 40)).collect();
-        let groups = vec![Group { label: "g".into(), ids: (0..200_000).collect() }];
+        let items: Vec<Item> = (0..200_000)
+            .map(|i| item(100 + (i % 7) * 30, 100 + (i % 5) * 40))
+            .collect();
+        let groups = vec![Group {
+            label: "g".into(),
+            ids: (0..200_000).collect(),
+        }];
         let t = std::time::Instant::now();
         for cols in [3, 5, 8, 12] {
             let l = Layout::compute(&items, &groups, 1600.0, cols, 4.0, true);

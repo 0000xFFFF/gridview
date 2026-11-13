@@ -35,7 +35,11 @@ pub struct Item {
 impl Item {
     pub fn aspect(&self) -> f32 {
         if self.w == 0 || self.h == 0 {
-            return if self.kind == Kind::Video { 16.0 / 9.0 } else { 4.0 / 3.0 };
+            return if self.kind == Kind::Video {
+                16.0 / 9.0
+            } else {
+                4.0 / 3.0
+            };
         }
         (self.w as f32 / self.h as f32).clamp(0.1, 10.0)
     }
@@ -107,7 +111,11 @@ fn save_dims_cache(map: &HashMap<String, CacheEntry>) {
 
 /// EXIF orientation (1..=8). Only JPEGs matter in practice.
 pub fn orientation(path: &Path) -> u32 {
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
     if ext != "jpg" && ext != "jpeg" {
         return 1;
     }
@@ -116,7 +124,10 @@ pub fn orientation(path: &Path) -> u32 {
     exif::Reader::new()
         .read_from_container(&mut r)
         .ok()
-        .and_then(|e| e.get_field(exif::Tag::Orientation, exif::In::PRIMARY).and_then(|f| f.value.get_uint(0)))
+        .and_then(|e| {
+            e.get_field(exif::Tag::Orientation, exif::In::PRIMARY)
+                .and_then(|f| f.value.get_uint(0))
+        })
         .unwrap_or(1)
 }
 
@@ -146,15 +157,20 @@ pub fn spawn_scan(root: PathBuf, ctx: eframe::egui::Context) -> ScanHandle {
     std::thread::spawn(move || {
         // ---- 1. walk ----
         let mut items: Vec<Item> = Vec::new();
-        let walker = WalkDir::new(&root).follow_links(false).into_iter().filter_entry(|e| {
-            // skip hidden directories (.git, .cache, ...) but never the root itself
-            e.depth() == 0 || !e.file_name().to_string_lossy().starts_with('.')
-        });
+        let walker = WalkDir::new(&root)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(|e| {
+                // skip hidden directories (.git, .cache, ...) but never the root itself
+                e.depth() == 0 || !e.file_name().to_string_lossy().starts_with('.')
+            });
         for e in walker.filter_map(|e| e.ok()) {
             if !e.file_type().is_file() {
                 continue;
             }
-            let Some(kind) = classify(e.path()) else { continue };
+            let Some(kind) = classify(e.path()) else {
+                continue;
+            };
             let Ok(md) = e.metadata() else { continue };
             let modified = secs(md.modified()).unwrap_or(0);
             let created = secs(md.created()).unwrap_or(modified);
@@ -183,8 +199,15 @@ pub fn spawn_scan(root: PathBuf, ctx: eframe::egui::Context) -> ScanHandle {
         // ---- 2. probe dimensions in parallel, using the on-disk cache ----
         let cache = load_dims_cache();
         let fresh: Mutex<HashMap<String, CacheEntry>> = Mutex::new(HashMap::new());
-        let threads = (std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4) * 2).max(4);
-        let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+        let threads = (std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            * 2)
+        .max(4);
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .unwrap();
         pool.install(|| {
             probe_list.par_chunks(128).for_each(|chunk| {
                 let mut out = Vec::with_capacity(chunk.len());
@@ -195,7 +218,15 @@ pub fn spawn_scan(root: PathBuf, ctx: eframe::egui::Context) -> ScanHandle {
                         Some(e) if e.mtime == *mt && e.size == *sz => (e.w, e.h),
                         _ => probe(p, *kind),
                     };
-                    local.push((key, CacheEntry { mtime: *mt, size: *sz, w, h }));
+                    local.push((
+                        key,
+                        CacheEntry {
+                            mtime: *mt,
+                            size: *sz,
+                            w,
+                            h,
+                        },
+                    ));
                     out.push((*id, w, h));
                 }
                 fresh.lock().unwrap().extend(local);

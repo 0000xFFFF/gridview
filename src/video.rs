@@ -8,10 +8,10 @@ use std::path::Path;
 #[cfg(feature = "video")]
 mod imp {
     use super::*;
-    use ffmpeg_next as ffmpeg;
     use ffmpeg::format::Pixel;
     use ffmpeg::media::Type;
     use ffmpeg::software::scaling::{Context as Scaler, Flags};
+    use ffmpeg_next as ffmpeg;
     use std::sync::Once;
 
     fn init() {
@@ -53,7 +53,11 @@ mod imp {
         if w == 0 || h == 0 {
             return None;
         }
-        Some(if matches!(rotation(&s), 90 | 270) { (h, w) } else { (w, h) })
+        Some(if matches!(rotation(&s), 90 | 270) {
+            (h, w)
+        } else {
+            (w, h)
+        })
     }
 
     fn grab(path: &Path, max_edge: u32, seek: bool) -> Option<RgbImage> {
@@ -100,7 +104,8 @@ mod imp {
         let scale = (max_edge as f32 / w.max(h) as f32).min(1.0);
         let tw = (((w as f32 * scale).round() as u32).max(2)) & !1;
         let th = (((h as f32 * scale).round() as u32).max(2)) & !1;
-        let mut scaler = Scaler::get(frame.format(), w, h, Pixel::RGB24, tw, th, Flags::AREA).ok()?;
+        let mut scaler =
+            Scaler::get(frame.format(), w, h, Pixel::RGB24, tw, th, Flags::AREA).ok()?;
         let mut rgb = ffmpeg::util::frame::Video::empty();
         scaler.run(&frame, &mut rgb).ok()?;
 
@@ -154,7 +159,12 @@ mod tests {
         assert_eq!(super::probe(p), Some((1280, 720)));
         let t = std::time::Instant::now();
         let img = super::thumbnail(p, 512).expect("frame");
-        eprintln!("video thumb {}x{} in {:?}", img.width(), img.height(), t.elapsed());
+        eprintln!(
+            "video thumb {}x{} in {:?}",
+            img.width(),
+            img.height(),
+            t.elapsed()
+        );
         assert_eq!(img.width(), 512);
     }
 }

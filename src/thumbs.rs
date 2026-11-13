@@ -59,9 +59,15 @@ pub struct Thumbs {
 
 impl Thumbs {
     pub fn new(ctx: eframe::egui::Context) -> Self {
-        let shared = Arc::new(Shared { q: Mutex::new(Queue::default()), cv: Condvar::new() });
+        let shared = Arc::new(Shared {
+            q: Mutex::new(Queue::default()),
+            cv: Condvar::new(),
+        });
         let (tx, rx) = channel();
-        let n = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).max(2);
+        let n = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            .max(2);
         for _ in 0..n {
             let shared = shared.clone();
             let tx = tx.clone();
@@ -95,7 +101,10 @@ fn worker(shared: Arc<Shared>, tx: Sender<Done>, ctx: eframe::egui::Context) {
                 if q.stop {
                     return;
                 }
-                let pos = q.wanted.iter().position(|r| !q.in_flight.contains(&(r.id, r.tier)));
+                let pos = q
+                    .wanted
+                    .iter()
+                    .position(|r| !q.in_flight.contains(&(r.id, r.tier)));
                 if let Some(pos) = pos {
                     let r = q.wanted.remove(pos);
                     q.in_flight.insert((r.id, r.tier));
@@ -105,11 +114,20 @@ fn worker(shared: Arc<Shared>, tx: Sender<Done>, ctx: eframe::egui::Context) {
             }
         };
         let img = load_thumb(&req);
-        let done = Done { id: req.id, tier: req.tier, img };
+        let done = Done {
+            id: req.id,
+            tier: req.tier,
+            img,
+        };
         if tx.send(done).is_err() {
             return;
         }
-        shared.q.lock().unwrap().in_flight.remove(&(req.id, req.tier));
+        shared
+            .q
+            .lock()
+            .unwrap()
+            .in_flight
+            .remove(&(req.id, req.tier));
         ctx.request_repaint();
     }
 }
@@ -127,7 +145,9 @@ fn cache_path(r: &Req) -> PathBuf {
     h = fnv(r.path.to_string_lossy().as_bytes(), h);
     h = fnv(&r.mtime.to_le_bytes(), h);
     h = fnv(&r.size.to_le_bytes(), h);
-    scan::cache_dir().join("thumbs").join(format!("{:016x}_{}.jpg", h, r.tier))
+    scan::cache_dir()
+        .join("thumbs")
+        .join(format!("{:016x}_{}.jpg", h, r.tier))
 }
 
 fn load_thumb(r: &Req) -> Option<RgbImage> {
@@ -142,7 +162,15 @@ fn load_thumb(r: &Req) -> Option<RgbImage> {
     let tmp = cp.with_extension("tmp");
     if let Ok(mut f) = File::create(&tmp) {
         let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut f, 85);
-        if enc.encode(img.as_raw(), img.width(), img.height(), image::ColorType::Rgb8).is_ok() {
+        if enc
+            .encode(
+                img.as_raw(),
+                img.width(),
+                img.height(),
+                image::ColorType::Rgb8,
+            )
+            .is_ok()
+        {
             let _ = fs::rename(&tmp, &cp);
         } else {
             let _ = fs::remove_file(&tmp);
@@ -199,7 +227,11 @@ pub fn make_image(path: &Path, kind: Kind, max_edge: u32) -> Option<RgbImage> {
     match kind {
         Kind::Video => crate::video::thumbnail(path, max_edge),
         Kind::Image => {
-            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
             let mut img = None;
             if ext == "jpg" || ext == "jpeg" {
                 img = decode_jpeg(path, max_edge).map(DynamicImage::ImageRgb8);
@@ -228,11 +260,18 @@ mod tests {
         let dir = std::env::temp_dir().join("gv_test");
         let _ = fs::create_dir_all(&dir);
         let p = dir.join("a.jpg");
-        let img = RgbImage::from_fn(3000, 2000, |x, y| image::Rgb([(x % 255) as u8, (y % 255) as u8, 90]));
+        let img = RgbImage::from_fn(3000, 2000, |x, y| {
+            image::Rgb([(x % 255) as u8, (y % 255) as u8, 90])
+        });
         img.save(&p).unwrap();
         let t = std::time::Instant::now();
         let out = make_image(&p, Kind::Image, 512).unwrap();
-        eprintln!("3000x2000 -> {}x{} in {:?}", out.width(), out.height(), t.elapsed());
+        eprintln!(
+            "3000x2000 -> {}x{} in {:?}",
+            out.width(),
+            out.height(),
+            t.elapsed()
+        );
         assert!(out.width().max(out.height()) <= 512 && out.width().max(out.height()) >= 400);
     }
 }
