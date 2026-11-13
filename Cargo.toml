@@ -1,0 +1,33 @@
+[package]
+name = "gridview"
+version = "0.1.0"
+edition = "2021"
+description = "Fast masonry image/video gallery (Rust rewrite)"
+
+[dependencies]
+eframe = "0.27"
+image = { version = "0.24", default-features = false, features = ["jpeg", "png", "gif", "bmp", "webp", "tiff"] }
+jpeg-decoder = "0.3"
+imagesize = "0.13"
+kamadak-exif = "0.5"
+walkdir = "2"
+rayon = "1"
+chrono = "0.4"
+directories = "5"
+serde = { version = "1", features = ["derive"] }
+bincode = "1"
+ffmpeg-next = { version = "9.1", optional = true }
+
+[features]
+default = ["video"]
+# In-process libav* video thumbnails (needs ffmpeg dev libs). Build with
+# `--no-default-features` to get a build without video thumbnails.
+video = ["dep:ffmpeg-next"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+
+[profile.dev]
+opt-level = 2
