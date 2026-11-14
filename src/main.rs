@@ -764,6 +764,14 @@ impl eframe::App for App {
             ui.horizontal(|ui| {
                 let te =
                     ui.add(egui::TextEdit::singleline(&mut self.path_input).desired_width(340.0));
+                if ui.button("...").clicked() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .set_directory(&self.path_input)
+                        .pick_folder()
+                    {
+                        self.path_input = path.to_string_lossy().into_owned();
+                    }
+                }
                 let go = (te.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)))
                     || ui.button("Open").clicked();
                 if go {

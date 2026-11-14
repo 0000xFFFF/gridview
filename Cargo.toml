@@ -17,6 +17,7 @@ directories = "5"
 serde = { version = "1", features = ["derive"] }
 bincode = "1"
 ffmpeg-next = { version = "9.1", optional = true }
+rfd = "0.15"
 
 [features]
 default = ["video"]
