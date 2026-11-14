@@ -225,7 +225,11 @@ fn apply_orientation(img: DynamicImage, o: u32) -> DynamicImage {
 /// Produce an RGB image whose longest side is at most `max_edge`.
 pub fn make_image(path: &Path, kind: Kind, max_edge: u32) -> Option<RgbImage> {
     match kind {
+        #[cfg(feature = "video-thumbnails")]
         Kind::Video => crate::video::thumbnail(path, max_edge),
+
+        #[cfg(not(feature = "video-thumbnails"))]
+        Kind::Video => None,
         Kind::Image => {
             let ext = path
                 .extension()

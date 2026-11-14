@@ -145,7 +145,11 @@ fn probe(path: &Path, kind: Kind) -> (u32, u32) {
                 (w, h)
             }
         }
+        #[cfg(feature = "video-thumbnails")]
         Kind::Video => crate::video::probe(path).unwrap_or((0, 0)),
+
+        #[cfg(not(feature = "video-thumbnails"))]
+        Kind::Video => (0, 0),
     }
 }
 

@@ -5,7 +5,7 @@
 use image::RgbImage;
 use std::path::Path;
 
-#[cfg(feature = "video")]
+#[cfg(feature = "video-thumbnails")]
 mod imp {
     use super::*;
     use ffmpeg::format::Pixel;
@@ -130,7 +130,7 @@ mod imp {
     }
 }
 
-#[cfg(not(feature = "video"))]
+#[cfg(not(feature = "video-thumbnails"))]
 mod imp {
     use super::*;
     pub fn probe(_: &Path) -> Option<(u32, u32)> {
@@ -148,7 +148,7 @@ pub fn thumbnail(path: &Path, max_edge: u32) -> Option<RgbImage> {
     imp::thumbnail(path, max_edge)
 }
 
-#[cfg(all(test, feature = "video"))]
+#[cfg(all(test, feature = "video-thumbnails"))]
 mod tests {
     #[test]
     fn thumbnail_from_generated_clip() {

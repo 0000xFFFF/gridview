@@ -1,7 +1,12 @@
 mod layout;
+
+#[cfg(feature = "video-player")]
 mod player;
+
 mod scan;
 mod thumbs;
+
+#[cfg(feature = "video-thumbnails")]
 mod video;
 
 use chrono::{Datelike, Local, TimeZone};
@@ -60,7 +65,11 @@ struct Viewer {
     tex: Option<TextureHandle>,
     fallback: Option<TextureHandle>,
     rx: Receiver<Option<egui::ColorImage>>,
+
+    #[cfg(feature = "video-player")]
     player: Option<player::Player>,
+
+    #[cfg(feature = "video-player")]
     video_tex: Option<TextureHandle>,
 }
 
@@ -362,6 +371,7 @@ impl App {
         let image_path = path.clone();
         let c = ctx.clone();
 
+        #[cfg(feature = "video-player")]
         let player = if kind == Kind::Video {
             match player::Player::open(&path, ctx.clone()) {
                 Ok(p) => Some(p),
@@ -389,18 +399,23 @@ impl App {
             tex: None,
             fallback: self.tex.get(&id).map(|t| t.handle.clone()),
             rx,
+            #[cfg(feature = "video-player")]
             player,
+
+            #[cfg(feature = "video-player")]
             video_tex: None,
         });
     }
 
     fn viewer_ui(&mut self, ctx: &egui::Context) {
         let Some(v) = &mut self.viewer else { return };
+
         if let Ok(Some(ci)) = v.rx.try_recv() {
             v.tex = Some(ctx.load_texture("viewer", ci, TextureOptions::LINEAR));
         }
 
         // Update video frame texture.
+        #[cfg(feature = "video-player")]
         if let Some(player) = v.player.as_mut() {
             if let Some(frame) = player.take_frame() {
                 let image = egui::ColorImage::from_rgb([frame.width, frame.height], &frame.pixels);
@@ -416,11 +431,16 @@ impl App {
 
         let id = v.id;
         let is_video = self.items[id as usize].kind == Kind::Video;
+
+        #[cfg(feature = "video-player")]
         let tex = v
             .video_tex
             .clone()
             .or_else(|| v.tex.clone())
             .or_else(|| v.fallback.clone());
+
+        #[cfg(not(feature = "video-player"))]
+        let tex = v.tex.clone().or_else(|| v.fallback.clone());
 
         enum Act {
             None,
@@ -449,6 +469,7 @@ impl App {
                 });
             });
 
+        #[cfg(feature = "video-player")]
         if let Some(player) = v.player.as_mut() {
             ctx.request_repaint_after(Duration::from_millis(33));
 
@@ -542,11 +563,22 @@ impl App {
                     FontId::proportional(13.0),
                     Color32::from_gray(180),
                 );
-                if is_video && v.player.as_ref().map_or(true, |player| !player.is_playing()) {
+
+                #[cfg(feature = "video-player")]
+                let show_play = is_video
+                    && v.player
+                        .as_ref()
+                        .map_or(true, |player| !player.is_playing());
+
+                #[cfg(not(feature = "video-player"))]
+                let show_play = is_video;
+
+                if show_play {
                     let c = screen.center();
                     p.circle_filled(c, 38.0, Color32::from_black_alpha(170));
                     draw_play(p, c, 18.0);
                 }
+
                 if resp.middle_clicked() {
                     reveal_in_file_manager(&self.items[id as usize].path);
                 } else if resp.clicked() {
@@ -565,9 +597,17 @@ impl App {
             } else if i.key_pressed(Key::Enter) {
                 act = Act::External;
             } else if i.key_pressed(Key::Space) {
-                if let Some(player) = v.player.as_mut() {
-                    player.toggle_play();
-                } else {
+                #[cfg(feature = "video-player")]
+                {
+                    if let Some(player) = v.player.as_mut() {
+                        player.toggle_play();
+                    } else {
+                        act = Act::External;
+                    }
+                }
+
+                #[cfg(not(feature = "video-player"))]
+                {
                     act = Act::External;
                 }
             }

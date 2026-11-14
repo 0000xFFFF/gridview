@@ -23,10 +23,10 @@ gstreamer-app = { version = "0.25", optional = true }
 gstreamer-video = { version = "0.25", optional = true }
 
 [features]
-default = ["video", "video-player"]
+default = ["video-thumbnails", "video-player"]
 # In-process libav* video thumbnails (needs ffmpeg dev libs). Build with
 # `--no-default-features` to get a build without video thumbnails (ffmpeg) or video player (gstreamer).
-video = ["dep:ffmpeg-next"]
+video-thumbnails = ["dep:ffmpeg-next"]
 video-player = ["dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video"]
 
 [profile.release]
