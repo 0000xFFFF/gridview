@@ -1,2 +1,3 @@
 - add dir counters for files in dir header faintly visible
-- add a normal file picker
+- switch emojis to actual icons or switch the font for the program
+
