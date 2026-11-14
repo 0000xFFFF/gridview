@@ -1,1 +1,2 @@
-- fix player controls
+- add icon
+- by default sort by month
