@@ -509,13 +509,18 @@ impl App {
                 .show(ctx, |ui| {
                     egui::Frame::popup(ui.style()).show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            let label = if player.is_playing() {
-                                "⏸️"
-                            } else {
-                                "▶️"
-                            };
-
-                            if ui.button(label).clicked() {
+                            let button_size = egui::vec2(28.0, 28.0);
+                            if ui
+                                .add_sized(
+                                    button_size,
+                                    egui::Button::new(if player.is_playing() {
+                                        "⏸"
+                                    } else {
+                                        "▶"
+                                    }),
+                                )
+                                .clicked()
+                            {
                                 player.toggle_play();
                             }
 
