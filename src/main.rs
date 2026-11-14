@@ -110,6 +110,29 @@ struct App {
     viewer: Option<Viewer>,
 }
 
+fn setup_fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+
+    fonts.font_data.insert(
+        "departure_mono".to_owned(),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/DepartureMonoNerdFontMono-Regular.otf")),
+    );
+
+    fonts
+        .families
+        .entry(egui::FontFamily::Proportional)
+        .or_default()
+        .insert(0, "departure_mono".to_owned());
+
+    fonts
+        .families
+        .entry(egui::FontFamily::Monospace)
+        .or_default()
+        .insert(0, "departure_mono".to_owned());
+
+    ctx.set_fonts(fonts);
+}
+
 fn reveal_in_file_manager(path: &Path) {
     use std::process::Command;
 
@@ -174,6 +197,9 @@ fn open_external(path: &Path) {
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>, root: PathBuf) -> Self {
+
+        setup_fonts(&cc.egui_ctx);
+
         let ctx = cc.egui_ctx.clone();
         let mut app = App {
             path_input: root.to_string_lossy().into_owned(),

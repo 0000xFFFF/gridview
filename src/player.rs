@@ -160,11 +160,8 @@ fn install_frame_callback(
                     .map_err(|_| gst::FlowError::NotNegotiated)?;
                 let buffer = sample.buffer().ok_or(gst::FlowError::Error)?;
 
-                let frame = gst_video::VideoFrame::from_buffer_readable(
-                    buffer.to_owned(),
-                    &info,
-                )
-                .map_err(|_| gst::FlowError::Error)?;
+                let frame = gst_video::VideoFrame::from_buffer_readable(buffer.to_owned(), &info)
+                    .map_err(|_| gst::FlowError::Error)?;
 
                 let width = frame.width() as usize;
                 let height = frame.height() as usize;
