@@ -98,6 +98,58 @@ struct App {
     viewer: Option<Viewer>,
 }
 
+fn reveal_in_file_manager(path: &Path) {
+    use std::process::Command;
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("explorer.exe")
+            .arg(format!("/select,{}", path.display()))
+            .spawn();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let desktop = std::env::var("XDG_CURRENT_DESKTOP")
+            .unwrap_or_default()
+            .to_lowercase();
+
+        // Prefer the file manager native to the current desktop.
+        let preferred: &[&str] = if desktop.contains("kde") || desktop.contains("plasma") {
+            &["dolphin", "thunar", "nemo", "nautilus", "caja"]
+        } else if desktop.contains("xfce") {
+            &["thunar", "dolphin", "nemo", "nautilus", "caja"]
+        } else if desktop.contains("gnome") {
+            &["nautilus", "dolphin", "thunar", "nemo", "caja"]
+        } else if desktop.contains("cinnamon") {
+            &["nemo", "dolphin", "thunar", "nautilus", "caja"]
+        } else if desktop.contains("mate") {
+            &["caja", "thunar", "dolphin", "nemo", "nautilus"]
+        } else {
+            &["dolphin", "thunar", "nemo", "nautilus", "caja"]
+        };
+
+        for manager in preferred {
+            if Command::new(manager)
+                .arg("--select")
+                .arg(path)
+                .spawn()
+                .is_ok()
+            {
+                break;
+            }
+        }
+    }
+}
+
 fn open_external(path: &Path) {
     use std::process::Command;
     #[cfg(target_os = "linux")]
@@ -384,7 +436,9 @@ impl App {
                     p.circle_filled(c, 38.0, Color32::from_black_alpha(170));
                     draw_play(p, c, 18.0);
                 }
-                if resp.clicked() {
+                if resp.middle_clicked() {
+                    reveal_in_file_manager(&self.items[id as usize].path);
+                } else if resp.clicked() {
                     act = if is_video { Act::External } else { Act::Close };
                 }
             });
@@ -579,7 +633,9 @@ impl App {
                 draw_play(&painter, c, 10.0);
             }
             let resp = ui.interact(r, Id::new(("tile", id)), Sense::click());
-            if resp.clicked() {
+            if resp.middle_clicked() {
+                reveal_in_file_manager(&item.path);
+            } else if resp.clicked() {
                 clicked = Some(id);
             }
             if pointer.map_or(false, |p| r.contains(p)) {
