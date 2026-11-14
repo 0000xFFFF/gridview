@@ -1,1 +1,2 @@
 - add dir counters for files in dir header faintly visible
+- add a normal file picker
