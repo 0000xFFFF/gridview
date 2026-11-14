@@ -529,7 +529,7 @@ impl App {
 
                             if duration > 0.0 {
                                 let response = ui.add_sized(
-                                    [380.0, 18.0],
+                                    [18.0, 18.0],
                                     egui::Slider::new(&mut position, 0.0..=duration)
                                         .show_value(false),
                                 );
