@@ -398,19 +398,18 @@ impl App {
 
         egui::Area::new(Id::new("viewer_controls"))
             .order(egui::Order::Foreground)
-            .fixed_pos(pos2(16.0, 16.0))
+            .fixed_pos(pos2(ctx.screen_rect().right() - 3.0, 3.0))
+            .pivot(Align2::RIGHT_TOP)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    if ui.button("Close").clicked() {
-                        act = Act::Close;
-                    }
-
-                    if ui.button("Show in folder").clicked() {
+                    if ui.button("📂 Show in folder").clicked() {
                         act = Act::Reveal;
                     }
-
-                    if ui.button("Open externally").clicked() {
+                    if ui.button("🚀 Open externally").clicked() {
                         act = Act::External;
+                    }
+                    if ui.button("❌ Close").clicked() {
+                        act = Act::Close;
                     }
                 });
             });
