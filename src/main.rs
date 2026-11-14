@@ -1,4 +1,5 @@
 mod layout;
+mod player;
 mod scan;
 mod thumbs;
 mod video;
@@ -59,6 +60,8 @@ struct Viewer {
     tex: Option<TextureHandle>,
     fallback: Option<TextureHandle>,
     rx: Receiver<Option<egui::ColorImage>>,
+    player: Option<player::Player>,
+    video_tex: Option<TextureHandle>,
 }
 
 struct App {
@@ -110,10 +113,7 @@ fn reveal_in_file_manager(path: &Path) {
 
     #[cfg(target_os = "macos")]
     {
-        let _ = Command::new("open")
-            .arg("-R")
-            .arg(path)
-            .spawn();
+        let _ = Command::new("open").arg("-R").arg(path).spawn();
     }
 
     #[cfg(target_os = "linux")]
@@ -359,9 +359,23 @@ impl App {
         let screen = ctx.screen_rect().size() * ctx.pixels_per_point();
         let edge = (screen.max_elem() as u32).clamp(1024, 4096);
         let (tx, rx) = channel();
+        let image_path = path.clone();
         let c = ctx.clone();
+
+        let player = if kind == Kind::Video {
+            match player::Player::open(&path, ctx.clone()) {
+                Ok(p) => Some(p),
+                Err(e) => {
+                    eprintln!("Video player error: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         std::thread::spawn(move || {
-            let ci = thumbs::make_image(&path, kind, edge).map(|img| {
+            let ci = thumbs::make_image(&image_path, kind, edge).map(|img| {
                 egui::ColorImage::from_rgb(
                     [img.width() as usize, img.height() as usize],
                     img.as_raw(),
@@ -375,6 +389,8 @@ impl App {
             tex: None,
             fallback: self.tex.get(&id).map(|t| t.handle.clone()),
             rx,
+            player,
+            video_tex: None,
         });
     }
 
@@ -383,9 +399,28 @@ impl App {
         if let Ok(Some(ci)) = v.rx.try_recv() {
             v.tex = Some(ctx.load_texture("viewer", ci, TextureOptions::LINEAR));
         }
+
+        // Update video frame texture.
+        if let Some(player) = v.player.as_mut() {
+            if let Some(frame) = player.take_frame() {
+                let image = egui::ColorImage::from_rgb([frame.width, frame.height], &frame.pixels);
+
+                if let Some(texture) = &mut v.video_tex {
+                    texture.set(image, TextureOptions::LINEAR);
+                } else {
+                    v.video_tex =
+                        Some(ctx.load_texture("video_frame", image, TextureOptions::LINEAR));
+                }
+            }
+        }
+
         let id = v.id;
         let is_video = self.items[id as usize].kind == Kind::Video;
-        let tex = v.tex.clone().or_else(|| v.fallback.clone());
+        let tex = v
+            .video_tex
+            .clone()
+            .or_else(|| v.tex.clone())
+            .or_else(|| v.fallback.clone());
 
         enum Act {
             None,
@@ -413,6 +448,63 @@ impl App {
                     }
                 });
             });
+
+        if let Some(player) = v.player.as_mut() {
+            ctx.request_repaint_after(Duration::from_millis(33));
+
+            let screen = ctx.screen_rect();
+
+            egui::Area::new(Id::new("viewer_transport"))
+                .order(egui::Order::Foreground)
+                .fixed_pos(pos2(screen.center().x, screen.bottom() - 16.0))
+                .pivot(Align2::CENTER_BOTTOM)
+                .show(ctx, |ui| {
+                    egui::Frame::popup(ui.style()).show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            let label = if player.is_playing() { "Pause" } else { "Play" };
+
+                            if ui.button(label).clicked() {
+                                player.toggle_play();
+                            }
+
+                            let duration = player.duration();
+                            let mut position = player.position().min(duration);
+
+                            if duration > 0.0 {
+                                let response = ui.add_sized(
+                                    [380.0, 18.0],
+                                    egui::Slider::new(&mut position, 0.0..=duration)
+                                        .show_value(false),
+                                );
+
+                                if response.changed() {
+                                    player.seek(position);
+                                }
+
+                                ui.label(format!(
+                                    "{:02}:{:02} / {:02}:{:02}",
+                                    position as u64 / 60,
+                                    position as u64 % 60,
+                                    duration as u64 / 60,
+                                    duration as u64 % 60,
+                                ));
+                            } else {
+                                ui.label("Loading...");
+                            }
+
+                            let mut volume = player.volume();
+
+                            ui.label("Volume");
+                            if ui
+                                .add(egui::Slider::new(&mut volume, 0.0..=1.0).show_value(false))
+                                .changed()
+                            {
+                                player.set_volume(volume);
+                            }
+                        });
+                    });
+                });
+        }
 
         egui::Area::new(Id::new("viewer"))
             .order(egui::Order::Middle)
@@ -450,7 +542,7 @@ impl App {
                     FontId::proportional(13.0),
                     Color32::from_gray(180),
                 );
-                if is_video {
+                if is_video && v.player.as_ref().map_or(true, |player| !player.is_playing()) {
                     let c = screen.center();
                     p.circle_filled(c, 38.0, Color32::from_black_alpha(170));
                     draw_play(p, c, 18.0);
@@ -463,7 +555,6 @@ impl App {
                 }
             });
 
-
         ctx.input(|i| {
             if i.key_pressed(Key::Escape) {
                 act = Act::Close;
@@ -471,8 +562,14 @@ impl App {
                 act = Act::Step(1);
             } else if i.key_pressed(Key::ArrowLeft) {
                 act = Act::Step(-1);
-            } else if i.key_pressed(Key::Enter) || i.key_pressed(Key::Space) {
+            } else if i.key_pressed(Key::Enter) {
                 act = Act::External;
+            } else if i.key_pressed(Key::Space) {
+                if let Some(player) = v.player.as_mut() {
+                    player.toggle_play();
+                } else {
+                    act = Act::External;
+                }
             }
         });
 
