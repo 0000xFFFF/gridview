@@ -583,8 +583,8 @@ impl App {
                 }
                 let name = self.items[id as usize].path.to_string_lossy().into_owned();
                 p.text(
-                    pos2(screen.min.x + 16.0, screen.max.y - 14.0),
-                    Align2::LEFT_BOTTOM,
+                    pos2(3.0, 3.0),
+                    Align2::LEFT_TOP,
                     name,
                     FontId::proportional(13.0),
                     Color32::from_gray(180),
@@ -945,7 +945,7 @@ impl eframe::App for App {
         }
 
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
-            ui.add_space(4.0);
+            ui.add_space(3.0);
             ui.horizontal(|ui| {
                 let te =
                     ui.add(egui::TextEdit::singleline(&mut self.path_input).desired_width(340.0));
@@ -1002,10 +1002,12 @@ impl eframe::App for App {
                     self.groups_dirty = true;
                 }
             });
-            ui.add_space(4.0);
+            ui.add_space(3.0);
         });
 
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
+            ui.add_space(3.0);
+
             let found = self
                 .scan
                 .as_ref()
@@ -1028,6 +1030,7 @@ impl eframe::App for App {
                 )
             };
             ui.label(txt);
+            ui.add_space(3.0);
         });
 
         egui::CentralPanel::default()
