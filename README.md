@@ -18,8 +18,8 @@ sudo apt update
 sudo apt install build-essential pkg-config clang libclang-dev \
     libavcodec-dev libavformat-dev libavutil-dev \
     libswscale-dev libswresample-dev \
-    libxkbcommon-dev libwayland-dev libgl1-mesa-dev
-# TODO: add debian packages for gstreamer
+    libxkbcommon-dev libwayland-dev libgl1-mesa-dev \
+    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ```
 
 </details>
