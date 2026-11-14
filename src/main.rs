@@ -392,11 +392,31 @@ impl App {
             Close,
             Step(i32),
             External,
+            Reveal,
         }
         let mut act = Act::None;
 
-        egui::Area::new(Id::new("viewer"))
+        egui::Area::new(Id::new("viewer_controls"))
             .order(egui::Order::Foreground)
+            .fixed_pos(pos2(16.0, 16.0))
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("Close").clicked() {
+                        act = Act::Close;
+                    }
+
+                    if ui.button("Show in folder").clicked() {
+                        act = Act::Reveal;
+                    }
+
+                    if ui.button("Open externally").clicked() {
+                        act = Act::External;
+                    }
+                });
+            });
+
+        egui::Area::new(Id::new("viewer"))
+            .order(egui::Order::Middle)
             .fixed_pos(Pos2::ZERO)
             .show(ctx, |ui| {
                 let screen = ctx.screen_rect();
@@ -439,9 +459,11 @@ impl App {
                 if resp.middle_clicked() {
                     reveal_in_file_manager(&self.items[id as usize].path);
                 } else if resp.clicked() {
-                    act = if is_video { Act::External } else { Act::Close };
+                    //act = if is_video { Act::External } else { Act::Close };
+                    act = Act::Close;
                 }
             });
+
 
         ctx.input(|i| {
             if i.key_pressed(Key::Escape) {
@@ -471,6 +493,7 @@ impl App {
                     self.open_viewer(ctx, nid);
                 }
             }
+            Act::Reveal => reveal_in_file_manager(&self.items[id as usize].path),
             Act::External => open_external(&self.items[id as usize].path),
         }
     }
