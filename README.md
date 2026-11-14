@@ -19,6 +19,7 @@ sudo apt install build-essential pkg-config clang libclang-dev \
     libavcodec-dev libavformat-dev libavutil-dev \
     libswscale-dev libswresample-dev \
     libxkbcommon-dev libwayland-dev libgl1-mesa-dev
+# TODO: add debian packages for gstreamer
 ```
 
 </details>
@@ -28,7 +29,9 @@ sudo apt install build-essential pkg-config clang libclang-dev \
 ```
 sudo pacman -Sy --needed base-devel pkgconf clang \
     ffmpeg libclang \
-    libxkbcommon wayland mesa
+    libxkbcommon wayland mesa \
+    gstreamer gst-plugins-base gst-plugins-good \
+    gst-plugins-bad gst-plugins-ugly gst-libav
 ```
 
 </details>
