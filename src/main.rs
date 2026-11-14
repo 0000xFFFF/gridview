@@ -504,7 +504,7 @@ impl App {
 
             egui::Area::new(Id::new("viewer_transport"))
                 .order(egui::Order::Foreground)
-                .fixed_pos(pos2(screen.center().x, screen.bottom() - 16.0))
+                .fixed_pos(pos2(screen.center().x, screen.bottom() - 10.0))
                 .pivot(Align2::CENTER_BOTTOM)
                 .show(ctx, |ui| {
                     egui::Frame::popup(ui.style()).show(ui, |ui| {
@@ -528,7 +528,8 @@ impl App {
                             let mut position = player.position().min(duration);
 
                             if duration > 0.0 {
-                                let slider_width = (ui.available_width() - 500.0).clamp(50.0, f32::MAX);
+                                let slider_width =
+                                    (ui.available_width() - 500.0).clamp(50.0, f32::MAX);
 
                                 let response = ui
                                     .allocate_ui_with_layout(
@@ -586,7 +587,11 @@ impl App {
                 p.rect_filled(screen, 0.0, Color32::from_black_alpha(242));
                 if let Some(t) = &tex {
                     let ts = t.size_vec2();
-                    let avail = screen.shrink(24.0).size();
+                    let avail = Rect::from_min_max(
+                        screen.min + vec2(24.0, 24.0),
+                        screen.max - vec2(24.0, 90.0),
+                    )
+                    .size();
                     let s = (avail.x / ts.x).min(avail.y / ts.y);
                     let r = Rect::from_center_size(screen.center(), ts * s);
                     p.image(
