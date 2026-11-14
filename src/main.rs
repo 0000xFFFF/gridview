@@ -115,7 +115,9 @@ fn setup_fonts(ctx: &egui::Context) {
 
     fonts.font_data.insert(
         "departure_mono".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/DepartureMonoNerdFontMono-Regular.otf")),
+        egui::FontData::from_static(include_bytes!(
+            "../assets/fonts/DepartureMonoNerdFontMono-Regular.otf"
+        )),
     );
 
     fonts
@@ -197,7 +199,6 @@ fn open_external(path: &Path) {
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>, root: PathBuf) -> Self {
-
         setup_fonts(&cc.egui_ctx);
 
         let ctx = cc.egui_ctx.clone();
@@ -508,7 +509,11 @@ impl App {
                 .show(ctx, |ui| {
                     egui::Frame::popup(ui.style()).show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            let label = if player.is_playing() { "Pause" } else { "Play" };
+                            let label = if player.is_playing() {
+                                "⏸️"
+                            } else {
+                                "▶️"
+                            };
 
                             if ui.button(label).clicked() {
                                 player.toggle_play();
