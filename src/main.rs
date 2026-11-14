@@ -528,11 +528,24 @@ impl App {
                             let mut position = player.position().min(duration);
 
                             if duration > 0.0 {
-                                let response = ui.add_sized(
-                                    [18.0, 18.0],
-                                    egui::Slider::new(&mut position, 0.0..=duration)
-                                        .show_value(false),
-                                );
+                                let slider_width = (ui.available_width() - 500.0).clamp(50.0, f32::MAX);
+
+                                let response = ui
+                                    .allocate_ui_with_layout(
+                                        egui::vec2(slider_width, 18.0),
+                                        egui::Layout::left_to_right(egui::Align::Center),
+                                        |ui| {
+                                            ui.set_min_width(slider_width);
+                                            ui.set_max_width(slider_width);
+                                            ui.style_mut().spacing.slider_width = slider_width;
+
+                                            ui.add(
+                                                egui::Slider::new(&mut position, 0.0..=duration)
+                                                    .show_value(false),
+                                            )
+                                        },
+                                    )
+                                    .inner;
 
                                 if response.changed() {
                                     player.seek(position);
