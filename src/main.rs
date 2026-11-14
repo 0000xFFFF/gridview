@@ -26,7 +26,7 @@ use thumbs::{Req, Thumbs};
 const TEX_BUDGET_BYTES: usize = 400 * 1024 * 1024;
 
 const APP_NAME: &str = "gridview";
-const SLIDER_COLUMNS_DEFAULT: usize = 12;
+const SLIDER_COLUMNS_DEFAULT: usize = 5;
 const SLIDER_COLUMNS_MIN: usize = 1;
 const SLIDER_COLUMNS_MAX: usize = 45;
 const WINDOW_WIDTH: f32 = 1280.0;
@@ -215,8 +215,8 @@ impl App {
             dims_done: 0,
             columns: SLIDER_COLUMNS_DEFAULT,
             gap: 4.0,
-            group_mode: GroupMode::Folder,
-            gran: DateGran::Day,
+            group_mode: GroupMode::Modified,
+            gran: DateGran::Month,
             zoom_acc: 1.0,
             groups_dirty: false,
             layout_dirty: false,
