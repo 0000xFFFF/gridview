@@ -35,6 +35,10 @@ pub struct Args {
     #[arg(short = 's', long, value_enum, default_value_t = SortMode::CreatedDay)]
     pub sort: SortMode,
 
+    /// Compact layout: pack small groups side by side instead of one group per row block
+    #[arg(short = 'C', long)]
+    pub compact: bool,
+
     /// Directory to open
     #[arg(value_name = "DIR", num_args = 0..)]
     pub dirs: Vec<PathBuf>,

@@ -48,6 +48,7 @@ No ffmpeg dev libs? `cargo build --release --no-default-features` (no video thum
 - Open a folder via the path box, CLI arg (e.g. ```gridview .```, ```gridview ~/Pictures```), or drag & drop a folder onto the window
 - Columns slider, or Ctrl+scroll / pinch
 - Grouping: by folder / date modified / date created (day or month), always recursive
+- Compact checkbox (top bar) or `-C` / `--compact`: packs small groups side by side, each group gets its own gray shade, hover a tile to see its group name
 - Click a tile for the viewer: Left/Right = prev/next, Esc = close, Enter = open in system player
 
 Cache lives in `~/.cache/gridview` (thumbnails + image sizes); delete it any time.

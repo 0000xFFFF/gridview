@@ -16,6 +16,8 @@ pub struct Placed {
     pub id: u32,
     pub y: f32,
     pub h: f32,
+    /// Index of the group (folder / date bucket) this item belongs to.
+    pub g: u32,
 }
 
 pub struct Header {
@@ -29,12 +31,14 @@ pub struct Layout {
     pub width: f32,
     pub columns: usize,
     pub gap: f32,
+    pub compact: bool,
     pub col_w: f32,
     /// Per column, items in increasing y (monotonic even across groups).
     pub cols: Vec<Vec<Placed>>,
     pub headers: Vec<Header>,
     pub y_of: Vec<f32>,
     pub h_of: Vec<f32>,
+    pub group_of: Vec<u32>,
     pub total_h: f32,
 }
 
@@ -46,6 +50,7 @@ impl Layout {
         columns: usize,
         gap: f32,
         show_headers: bool,
+        compact: bool,
     ) -> Self {
         let columns = columns.max(1);
         let col_w = ((width - gap * (columns as f32 + 1.0)) / columns as f32).max(16.0);
@@ -53,13 +58,18 @@ impl Layout {
         let mut headers = Vec::new();
         let mut y_of = vec![0.0; items.len()];
         let mut h_of = vec![0.0; items.len()];
+        let mut group_of = vec![0u32; items.len()];
         let mut cursor = gap;
+        // Compact mode: no headers, and column heights carry over from one
+        // group to the next, so a small group leaves no empty space beside it;
+        // the next group simply starts in the shortest column(s).
+        let mut shared_col_h = vec![cursor; columns];
 
-        for g in groups {
+        for (gi, g) in groups.iter().enumerate() {
             if g.ids.is_empty() {
                 continue;
             }
-            if show_headers {
+            if show_headers && !compact {
                 headers.push(Header {
                     y: cursor,
                     label: g.label.clone(),
@@ -67,7 +77,8 @@ impl Layout {
                 });
                 cursor += HEADER_H;
             }
-            let mut col_h = vec![cursor; columns];
+            let mut fresh = vec![cursor; columns];
+            let col_h = if compact { &mut shared_col_h } else { &mut fresh };
             for &id in &g.ids {
                 // Shortest column wins, ties go to the leftmost => the first
                 // `columns` items form row 1 left-to-right, then row 2, ...
@@ -79,23 +90,31 @@ impl Layout {
                 }
                 let h = col_w / items[id as usize].aspect();
                 let y = col_h[c];
-                cols[c].push(Placed { id, y, h });
+                cols[c].push(Placed { id, y, h, g: gi as u32 });
+                group_of[id as usize] = gi as u32;
                 y_of[id as usize] = y;
                 h_of[id as usize] = h;
                 col_h[c] = y + h + gap;
             }
-            cursor = col_h.iter().cloned().fold(cursor, f32::max) + gap;
+            if !compact {
+                cursor = col_h.iter().cloned().fold(cursor, f32::max) + gap;
+            }
+        }
+        if compact {
+            cursor = shared_col_h.iter().cloned().fold(cursor, f32::max) + gap;
         }
 
         Layout {
             width,
             columns,
             gap,
+            compact,
             col_w,
             cols,
             headers,
             y_of,
             h_of,
+            group_of,
             total_h: cursor,
         }
     }
@@ -163,7 +182,7 @@ mod tests {
             label: "g".into(),
             ids: (0..10).collect(),
         }];
-        let l = Layout::compute(&items, &groups, 1000.0, 4, 4.0, false);
+        let l = Layout::compute(&items, &groups, 1000.0, 4, 4.0, false, false);
         // first four items land in columns 0,1,2,3 in order, all at the same y
         for c in 0..4 {
             assert_eq!(l.cols[c][0].id, c as u32);
@@ -182,11 +201,32 @@ mod tests {
         }];
         let t = std::time::Instant::now();
         for cols in [3, 5, 8, 12] {
-            let l = Layout::compute(&items, &groups, 1600.0, cols, 4.0, true);
+            let l = Layout::compute(&items, &groups, 1600.0, cols, 4.0, true, false);
             let mut n = 0;
             l.visit(50_000.0, 51_000.0, |_, _| n += 1);
             assert!(n > 0 && n < 200, "visible = {n}");
         }
         eprintln!("4 relayouts of 200k items: {:?}", t.elapsed());
+    }
+
+    #[test]
+    fn compact_fills_space_beside_small_groups() {
+        // 3 groups of 2 equal squares each, 4 columns.
+        let items: Vec<Item> = (0..6).map(|_| item(100, 100)).collect();
+        let groups: Vec<Group> = (0..3)
+            .map(|g| Group { label: format!("g{g}"), ids: vec![g * 2, g * 2 + 1] })
+            .collect();
+        let normal = Layout::compute(&items, &groups, 1000.0, 4, 4.0, true, false);
+        let compact = Layout::compute(&items, &groups, 1000.0, 4, 4.0, true, true);
+        assert!(compact.headers.is_empty());
+        assert!(compact.total_h < normal.total_h * 0.7, "{} vs {}", compact.total_h, normal.total_h);
+        // group 1 starts in the columns to the right of group 0, on the first row
+        assert_eq!(compact.y_of[2], compact.y_of[0]);
+        assert_eq!(compact.group_of[2], 1);
+        assert_eq!(compact.cols[2][0].id, 2);
+        assert_eq!(compact.cols[3][0].id, 3);
+        // group 2 wraps to the next row, still left to right
+        assert!(compact.y_of[4] > compact.y_of[0]);
+        assert_eq!(compact.cols[0][1].id, 4);
     }
 }

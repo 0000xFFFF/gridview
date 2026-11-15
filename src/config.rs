@@ -10,5 +10,6 @@ pub struct AppConfig {
     pub columns: usize,
     pub group_mode: GroupMode,
     pub gran: DateGran,
+    pub compact: bool,
 }
 

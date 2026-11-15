@@ -64,6 +64,7 @@ struct App {
     gap: f32,
     group_mode: GroupMode,
     gran: DateGran,
+    compact: bool,
     zoom_acc: f32,
 
     groups_dirty: bool,
@@ -191,9 +192,10 @@ impl App {
             scanning: false,
             dims_done: 0,
             columns: config.columns.clamp(SLIDER_COLUMNS_MIN, SLIDER_COLUMNS_MAX),
-            gap: 4.0,
+            gap: gap_for(config.compact),
             group_mode: config.group_mode,
             gran: config.gran,
+            compact: config.compact,
             zoom_acc: 1.0,
             groups_dirty: false,
             layout_dirty: false,
@@ -291,6 +293,7 @@ impl App {
             self.columns,
             self.gap,
             self.group_mode != GroupMode::Folder || self.groups.len() > 1,
+            self.compact,
         );
         self.layout_dirty = false;
         self.last_layout = Instant::now();
@@ -675,6 +678,7 @@ impl App {
         let throttled = self.scanning && self.last_layout.elapsed() < Duration::from_millis(200);
         let structural = self.layout.columns != self.columns
             || self.layout.gap != self.gap
+            || self.layout.compact != self.compact
             || (self.layout.width - width).abs() > 0.5;
         if structural || (self.layout_dirty && !throttled) {
             self.relayout(width);
@@ -787,6 +791,10 @@ impl App {
         let pointer = ctx.pointer_hover_pos();
         for (id, r) in vis {
             let item = &self.items[id as usize];
+            let group = self.layout.group_of.get(id as usize).copied().unwrap_or(0);
+            if self.layout.compact {
+                painter.rect_filled(r.expand(self.layout.gap * 0.5), 0.0, group_shade(group));
+            }
             match self.tex.get(&id) {
                 Some(t) => {
                     let ts = t.handle.size_vec2();
@@ -822,7 +830,12 @@ impl App {
                 painter.circle_filled(c, 20.0, Color32::from_black_alpha(140));
                 draw_play(&painter, c, 10.0);
             }
-            let resp = ui.interact(r, Id::new(("tile", id)), Sense::click());
+            let mut resp = ui.interact(r, Id::new(("tile", id)), Sense::click());
+            if self.layout.compact {
+                if let Some(g) = self.groups.get(group as usize) {
+                    resp = resp.on_hover_text(format!("{}  ({} items)", g.label, g.ids.len()));
+                }
+            }
             if resp.middle_clicked() {
                 reveal_in_file_manager(&item.path);
             } else if resp.clicked() {
@@ -840,6 +853,21 @@ impl App {
             self.open_viewer(&ctx, id);
         }
     }
+}
+
+fn gap_for(compact: bool) -> f32 {
+    if compact {
+        8.0
+    } else {
+        4.0
+    }
+}
+
+/// Background shade for a group's frame in compact mode. Cycles through a few
+/// clearly different dark grays so neighbouring groups can be told apart.
+fn group_shade(g: u32) -> Color32 {
+    const SHADES: [u8; 4] = [26, 52, 78, 104];
+    Color32::from_gray(SHADES[g as usize % SHADES.len()])
 }
 
 fn draw_play(p: &egui::Painter, c: Pos2, s: f32) {
@@ -1012,6 +1040,17 @@ impl eframe::App for App {
                 if changed {
                     self.groups_dirty = true;
                 }
+                ui.separator();
+                if ui
+                    .checkbox(&mut self.compact, "Compact")
+                    .on_hover_text(
+                        "Pack small groups side by side to use the full width.\n\
+                         Groups get different background shades; hover a tile to see its group.",
+                    )
+                    .changed()
+                {
+                    self.gap = gap_for(self.compact);
+                }
             });
             ui.add_space(3.0);
         });
@@ -1081,6 +1120,7 @@ fn main() -> eframe::Result<()> {
         columns: args.columns,
         group_mode,
         gran,
+        compact: args.compact,
     };
 
     // load app icon
