@@ -16,8 +16,6 @@ pub struct Placed {
     pub id: u32,
     pub y: f32,
     pub h: f32,
-    /// Index of the group (folder / date bucket) this item belongs to.
-    pub g: u32,
 }
 
 pub struct Header {
@@ -90,7 +88,7 @@ impl Layout {
                 }
                 let h = col_w / items[id as usize].aspect();
                 let y = col_h[c];
-                cols[c].push(Placed { id, y, h, g: gi as u32 });
+                cols[c].push(Placed { id, y, h });
                 group_of[id as usize] = gi as u32;
                 y_of[id as usize] = y;
                 h_of[id as usize] = h;
