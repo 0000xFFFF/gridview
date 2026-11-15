@@ -1083,11 +1083,23 @@ fn main() -> eframe::Result<()> {
         gran,
     };
 
+    // load app icon
+    use std::sync::Arc;
+    let icon_bytes = include_bytes!("../assets/icon.png");
+    let icon_image = image::load_from_memory(icon_bytes).expect("Failed to load application icon");
+    let icon_rgba = icon_image.to_rgba8();
+    let icon = egui::IconData {
+        rgba: icon_rgba.into_raw(),
+        width: icon_image.width(),
+        height: icon_image.height(),
+    };
+
     let opts = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([config.width as f32, config.height as f32])
             .with_fullscreen(config.fullscreen)
-            .with_title(APP_NAME),
+            .with_title(APP_NAME)
+            .with_icon(Arc::new(icon)),
         ..Default::default()
     };
 
