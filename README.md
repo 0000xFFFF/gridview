@@ -1,9 +1,6 @@
-# gridview (Rust)
-
-Masonry image/video gallery. 
+# <img src="assets/icon.png" width="25"> gridview - masonry image/video gallery
 
 ![preview](preview/preview.gif)
-
 
 Rewrite of the Electron version, built for folders with tens of thousands of files. Made to be faster.
 
