@@ -1,0 +1,97 @@
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    name: Build Linux
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config clang libclang-dev \
+            libavcodec-dev libavformat-dev libavutil-dev \
+            libswscale-dev libswresample-dev \
+            libxkbcommon-dev libwayland-dev libgl1-mesa-dev
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          DIR="gridview-linux-x86_64"
+
+          mkdir -p "$DIR/share/applications"
+          mkdir -p "$DIR/share/icons/hicolor/256x256/apps"
+
+          cp target/release/gridview "$DIR/"
+          cp packaging/gridview.desktop "$DIR/share/applications/"
+          cp assets/icon.png "$DIR/share/icons/hicolor/256x256/apps/gridview.png"
+          cp README.md LICENSE "$DIR/"
+
+          tar -czf "${DIR}-${VERSION}.tar.gz" "$DIR"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: "*.tar.gz"
+
+  windows:
+    name: Build Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $dir = "gridview-windows-x86_64"
+
+          New-Item -ItemType Directory -Force $dir | Out-Null
+
+          Copy-Item target/release/gridview.exe $dir/
+          Copy-Item README.md $dir/
+          Copy-Item LICENSE $dir/
+
+          Compress-Archive -Path "$dir/*" `
+            -DestinationPath "$dir-$version.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: "*.zip"
+
+  release:
+    name: Publish GitHub Release
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*
+          generate_release_notes: true
