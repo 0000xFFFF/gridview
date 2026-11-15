@@ -1,7 +1,19 @@
+mod globals;
 mod layout;
 
 #[cfg(feature = "video-player")]
 mod player;
+
+mod cli;
+mod config;
+
+use crate::globals::{
+    DateGran, GroupMode, Tex, APP_NAME, SLIDER_COLUMNS_MAX, SLIDER_COLUMNS_MIN, TEX_BUDGET_BYTES,
+};
+
+use clap::Parser;
+use cli::{Args, SortMode};
+use config::AppConfig;
 
 mod scan;
 mod thumbs;
@@ -22,43 +34,6 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver};
 use std::time::{Duration, Instant};
 use thumbs::{Req, Thumbs};
-
-const TEX_BUDGET_BYTES: usize = 400 * 1024 * 1024;
-
-const APP_NAME: &str = "gridview";
-const SLIDER_COLUMNS_DEFAULT: usize = 5;
-const SLIDER_COLUMNS_MIN: usize = 1;
-const SLIDER_COLUMNS_MAX: usize = 45;
-const WINDOW_WIDTH: f32 = 1280.0;
-const WINDOW_HEIGHT: f32 = 800.0;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum GroupMode {
-    Folder,
-    Modified,
-    Created,
-}
-impl GroupMode {
-    fn label(self) -> &'static str {
-        match self {
-            GroupMode::Folder => "By folder",
-            GroupMode::Modified => "By date modified",
-            GroupMode::Created => "By date created",
-        }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum DateGran {
-    Day,
-    Month,
-}
-
-struct Tex {
-    handle: TextureHandle,
-    tier: u32,
-    bytes: usize,
-}
 
 struct Viewer {
     id: u32,
@@ -198,13 +173,15 @@ fn open_external(path: &Path) {
 }
 
 impl App {
-    fn new(cc: &eframe::CreationContext<'_>, root: PathBuf) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>, config: AppConfig) -> Self {
         setup_fonts(&cc.egui_ctx);
+
+        let path_input = config.root.to_string_lossy().into_owned();
 
         let ctx = cc.egui_ctx.clone();
         let mut app = App {
-            path_input: root.to_string_lossy().into_owned(),
-            root: root.clone(),
+            path_input,
+            root: config.root.clone(),
             items: vec![],
             groups: vec![],
             order: vec![],
@@ -213,10 +190,10 @@ impl App {
             scan: None,
             scanning: false,
             dims_done: 0,
-            columns: SLIDER_COLUMNS_DEFAULT,
+            columns: config.columns.clamp(SLIDER_COLUMNS_MIN, SLIDER_COLUMNS_MAX),
             gap: 4.0,
-            group_mode: GroupMode::Modified,
-            gran: DateGran::Month,
+            group_mode: config.group_mode,
+            gran: config.gran,
             zoom_acc: 1.0,
             groups_dirty: false,
             layout_dirty: false,
@@ -233,7 +210,7 @@ impl App {
             scroll_target: None,
             viewer: None,
         };
-        app.open_dir(root, &ctx);
+        app.open_dir(config.root, &ctx);
         app
     }
 
@@ -1070,18 +1047,47 @@ impl eframe::App for App {
 }
 
 fn main() -> eframe::Result<()> {
-    let root = std::env::args()
-        .nth(1)
-        .map(PathBuf::from)
+    let args = Args::parse();
+
+    let root = args
+        .dirs
+        .iter()
+        .find(|path| path.is_dir())
+        .cloned()
         .or_else(|| {
             directories::UserDirs::new().and_then(|d| d.picture_dir().map(|p| p.to_path_buf()))
         })
         .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let (group_mode, gran) = match args.sort {
+        SortMode::Folder => (GroupMode::Folder, DateGran::Month),
+        SortMode::ModifiedDay => (GroupMode::Modified, DateGran::Day),
+        SortMode::ModifiedMonth => (GroupMode::Modified, DateGran::Month),
+        SortMode::CreatedDay => (GroupMode::Created, DateGran::Day),
+        SortMode::CreatedMonth => (GroupMode::Created, DateGran::Month),
+    };
+
+    let config = AppConfig {
+        root,
+        width: args.width,
+        height: args.height,
+        fullscreen: args.fullscreen,
+        columns: args.columns,
+        group_mode,
+        gran,
+    };
+
     let opts = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([WINDOW_WIDTH, WINDOW_HEIGHT])
+            .with_inner_size([config.width as f32, config.height as f32])
+            .with_fullscreen(config.fullscreen)
             .with_title(APP_NAME),
         ..Default::default()
     };
-    eframe::run_native(APP_NAME, opts, Box::new(|cc| Box::new(App::new(cc, root))))
+
+    eframe::run_native(
+        APP_NAME,
+        opts,
+        Box::new(move |cc| Box::new(App::new(cc, config))),
+    )
 }

@@ -21,6 +21,7 @@ ffmpeg-next = { version = "9.1", optional = true }
 gstreamer = { version = "0.25", optional = true }
 gstreamer-app = { version = "0.25", optional = true }
 gstreamer-video = { version = "0.25", optional = true }
+clap = { version = "4.6.7", features = ["derive"] }
 
 [features]
 default = ["video-thumbnails", "video-player"]
