@@ -927,6 +927,12 @@ impl eframe::App for App {
         self.poll_scan();
         self.poll_thumbs(ctx);
 
+        // handle fullscreen f11
+        if ctx.input(|i| i.key_pressed(egui::Key::F11)) {
+            let fullscreen = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(!fullscreen));
+        }
+
         // drag & drop a folder onto the window
         if let Some(p) = ctx.input(|i| i.raw.dropped_files.first().and_then(|f| f.path.clone())) {
             let dir = if p.is_dir() {
