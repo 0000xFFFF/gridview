@@ -222,6 +222,15 @@ fn apply_orientation(img: DynamicImage, o: u32) -> DynamicImage {
     }
 }
 
+fn is_jpeg(path: &Path) -> bool {
+    use std::io::Read;
+    let mut b = [0u8; 3];
+    File::open(path)
+        .and_then(|mut f| f.read_exact(&mut b))
+        .map(|_| b == [0xFF, 0xD8, 0xFF])
+        .unwrap_or(false)
+}
+
 /// Produce an RGB image whose longest side is at most `max_edge`.
 pub fn make_image(path: &Path, kind: Kind, max_edge: u32) -> Option<RgbImage> {
     match kind {
@@ -230,19 +239,20 @@ pub fn make_image(path: &Path, kind: Kind, max_edge: u32) -> Option<RgbImage> {
 
         #[cfg(not(feature = "video-thumbnails"))]
         Kind::Video => None,
+
         Kind::Image => {
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_ascii_lowercase();
             let mut img = None;
-            if ext == "jpg" || ext == "jpeg" {
+            if is_jpeg(path) {
                 img = decode_jpeg(path, max_edge).map(DynamicImage::ImageRgb8);
             }
             let img = match img {
                 Some(i) => i,
-                None => image::open(path).ok()?,
+                None => image::io::Reader::open(path)
+                    .ok()?
+                    .with_guessed_format() // sniff magic bytes, ignore extension
+                    .ok()?
+                    .decode()
+                    .ok()?,
             };
             let img = apply_orientation(img, scan::orientation(path));
             let img = if img.width().max(img.height()) > max_edge {
