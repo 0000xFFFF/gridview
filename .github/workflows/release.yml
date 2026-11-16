@@ -97,6 +97,7 @@ jobs:
           name: linux-release
           path: "*.tar.gz"
 
+
   windows:
     name: Windows x64
     runs-on: windows-latest
@@ -126,19 +127,18 @@ jobs:
         with:
           targets: x86_64-pc-windows-gnu
 
-      - name: Add Cargo to PATH
-        shell: pwsh
-        run: |
-          echo "$env:USERPROFILE\.cargo\bin" >> $env:GITHUB_PATH
-
-      - name: Verify toolchain
+      - name: Configure Rust environment
         shell: msys2 {0}
         run: |
-          export PATH="$USERPROFILE/.cargo/bin:$PATH"
+          CARGO_DIR="$(cygpath -u "$USERPROFILE")/.cargo/bin"
+          export PATH="$CARGO_DIR:$PATH"
 
+          echo "Cargo directory: $CARGO_DIR"
           cargo --version
           rustc --version
-          gcc --version
+
+          rustup target add x86_64-pc-windows-gnu
+          rustup target list --installed
 
       - name: Verify native libraries
         shell: msys2 {0}
@@ -155,7 +155,8 @@ jobs:
         env:
           CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
         run: |
-          export PATH="$USERPROFILE/.cargo/bin:$PATH"
+          CARGO_DIR="$(cygpath -u "$USERPROFILE")/.cargo/bin"
+          export PATH="$CARGO_DIR:$PATH"
 
           cargo build --release --target x86_64-pc-windows-gnu
 
