@@ -96,7 +96,10 @@ jobs:
 
       - name: Build
         shell: msys2 {0}
-        run: cargo build --release --locked
+        run: |
+          export LIBCLANG_PATH=/ucrt64/bin
+          export BINDGEN_EXTRA_CLANG_ARGS="--target=x86_64-w64-windows-gnu"
+          cargo build --release --locked
 
       # Ship the exe together with every MSYS2 DLL it links against,
       # otherwise it only runs on machines that have MSYS2 installed.
