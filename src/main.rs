@@ -16,6 +16,7 @@ use cli::{Args, SortMode};
 use config::AppConfig;
 
 mod scan;
+mod search;
 mod thumbs;
 
 #[cfg(feature = "video-thumbnails")]
@@ -23,10 +24,11 @@ mod video;
 
 use chrono::{Datelike, Local, TimeZone};
 use eframe::egui::{
-    self, pos2, vec2, Align2, Color32, FontId, Id, Key, Pos2, Rect, Sense, Stroke, TextureHandle,
-    TextureOptions,
+    self, pos2, vec2, Align2, Color32, FontId, Id, Key, Modifiers, Pos2, Rect, RichText, Sense,
+    Stroke, TextureHandle, TextureOptions,
 };
 use layout::{Group, Layout, HEADER_H};
+use rayon::prelude::*;
 use scan::{Item, Kind, ScanHandle, ScanMsg};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -84,6 +86,13 @@ struct App {
     scroll_target: Option<(f32, u8)>,
 
     viewer: Option<Viewer>,
+
+    search: search::Search,
+    /// Lower-cased relative path of every item (index = item id). Built lazily
+    /// the first time a search needs it, cleared when the item list changes.
+    rel_lc: Vec<String>,
+    /// Scroll to the current hit once the hits have been recomputed.
+    search_reveal: bool,
 }
 
 fn setup_fonts(ctx: &egui::Context) {
@@ -211,6 +220,9 @@ impl App {
             bar_reserve: 0.0,
             scroll_target: None,
             viewer: None,
+            search: search::Search::default(),
+            rel_lc: vec![],
+            search_reveal: false,
         };
         app.open_dir(config.root, &ctx);
         app
@@ -230,6 +242,8 @@ impl App {
         self.last_wanted.clear();
         self.thumbs.set_wanted(vec![]);
         self.viewer = None;
+        self.rel_lc.clear();
+        self.search.dirty = true;
         self.dims_done = 0;
         self.scroll_y = 0.0;
         self.scroll_target = Some((0.0, 1));
@@ -248,6 +262,7 @@ impl App {
             match m {
                 ScanMsg::Walked(v) => {
                     self.items = v;
+                    self.rel_lc.clear();
                     self.groups_dirty = true;
                 }
                 ScanMsg::Dims(v) => {
@@ -281,6 +296,44 @@ impl App {
             self.order_pos[*id as usize] = i as u32;
         }
         self.layout_dirty = true;
+        self.search.dirty = true;
+    }
+
+    // ---------------------------------------------------------------- search
+    /// Re-run the search against the current grid order. Called from `grid_ui`
+    /// right after the groups were rebuilt, so `order` is always up to date.
+    fn refresh_search(&mut self) {
+        if self.search.query.split_whitespace().next().is_some()
+            && self.rel_lc.len() != self.items.len()
+        {
+            let root = &self.root;
+            let cache: Vec<String> = self
+                .items
+                .par_iter()
+                .map(|it| search::rel_path(root, &it.path).to_lowercase())
+                .collect();
+            self.rel_lc = cache;
+        }
+        self.search
+            .recompute(&self.order, &self.rel_lc, self.items.len());
+    }
+
+    /// Scroll so that item `id` is on screen. With `only_if_hidden` an item
+    /// that is already comfortably visible doesn't move the view.
+    fn reveal_item(&mut self, id: u32, only_if_hidden: bool, ctx: &egui::Context) {
+        let (Some(&y), Some(&h)) = (
+            self.layout.y_of.get(id as usize),
+            self.layout.h_of.get(id as usize),
+        ) else {
+            return;
+        };
+        let margin = self.view_h * 0.08;
+        let visible = y >= self.scroll_y + margin && y + h <= self.scroll_y + self.view_h - margin;
+        if only_if_hidden && visible {
+            return;
+        }
+        self.scroll_target = Some(((y + h * 0.5 - self.view_h * 0.5).max(0.0), 1));
+        ctx.request_repaint();
     }
 
     fn relayout(&mut self, width: f32) {
@@ -673,6 +726,9 @@ impl App {
         if self.groups_dirty {
             self.rebuild_groups();
         }
+        if self.search.dirty && self.search.open {
+            self.refresh_search();
+        }
         let outer = ui.available_width();
         let width = (outer - self.bar_reserve).max(100.0);
         let throttled = self.scanning && self.last_layout.elapsed() < Duration::from_millis(200);
@@ -789,6 +845,14 @@ impl App {
         let ctx = ui.ctx().clone();
         let mut clicked = None;
         let pointer = ctx.pointer_hover_pos();
+        // Dim non-matching tiles only when there is something to show instead.
+        let search_on = self.search.active() && self.search.total() > 0;
+        let current_hit = if search_on {
+            self.search.current_id()
+        } else {
+            None
+        };
+        let mut current_rect = None;
         for (id, r) in vis {
             let item = &self.items[id as usize];
             let group = self.layout.group_of.get(id as usize).copied().unwrap_or(0);
@@ -830,12 +894,39 @@ impl App {
                 painter.circle_filled(c, 20.0, Color32::from_black_alpha(140));
                 draw_play(&painter, c, 10.0);
             }
-            let mut resp = ui.interact(r, Id::new(("tile", id)), Sense::click());
-            if self.layout.compact {
-                if let Some(g) = self.groups.get(group as usize) {
-                    resp = resp.on_hover_text(format!("{}  ({} items)", g.label, g.ids.len()));
+            if search_on {
+                search::paint_tile_overlay(&painter, r, self.search.is_hit(id));
+                if current_hit == Some(id) {
+                    current_rect = Some((r, id));
                 }
             }
+            let resp = ui.interact(r, Id::new(("tile", id)), Sense::click());
+            let resp = resp.on_hover_ui(|ui| {
+                ui.set_max_width(460.0);
+                let rel = search::rel_path(&self.root, &item.path);
+                let words: &[String] = if self.search.active() {
+                    self.search.words()
+                } else {
+                    &[]
+                };
+                ui.label(search::path_job(
+                    &rel,
+                    words,
+                    FontId::proportional(13.0),
+                    ui.visuals().text_color(),
+                    440.0,
+                    usize::MAX,
+                ));
+                if self.layout.compact {
+                    if let Some(g) = self.groups.get(group as usize) {
+                        ui.label(
+                            RichText::new(format!("{}  ({} items)", g.label, g.ids.len()))
+                                .small()
+                                .weak(),
+                        );
+                    }
+                }
+            });
             if resp.middle_clicked() {
                 reveal_in_file_manager(&item.path);
             } else if resp.clicked() {
@@ -848,6 +939,11 @@ impl App {
                     Stroke::new(2.0_f32, Color32::from_rgb(90, 160, 255)),
                 );
             }
+        }
+        // Painted last so no neighbouring tile can cover the glow.
+        if let Some((r, id)) = current_rect {
+            let rel = search::rel_path(&self.root, &self.items[id as usize].path);
+            search::paint_current(&painter, r, &rel, self.search.words());
         }
         if let Some(id) = clicked {
             self.open_viewer(&ctx, id);
@@ -961,6 +1057,33 @@ impl eframe::App for App {
             ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(!fullscreen));
         }
 
+        // Ctrl+F opens the search, Esc closes it, F3 / Shift+F3 jump between hits.
+        // (Ignored while the viewer is open: it owns Esc and the arrow keys.)
+        let mut key_step = 0;
+        if self.viewer.is_none() {
+            let was_open = self.search.open;
+            let (find, esc, prev, next) = ctx.input_mut(|i| {
+                (
+                    i.consume_key(Modifiers::COMMAND, Key::F),
+                    was_open && i.consume_key(Modifiers::NONE, Key::Escape),
+                    was_open && i.consume_key(Modifiers::SHIFT, Key::F3),
+                    was_open && i.consume_key(Modifiers::NONE, Key::F3),
+                )
+            });
+            if find {
+                self.search.open_dialog();
+            } else if esc {
+                self.search.open = false;
+            }
+            key_step = if prev {
+                -1
+            } else if next {
+                1
+            } else {
+                0
+            };
+        }
+
         // drag & drop a folder onto the window
         if let Some(p) = ctx.input(|i| i.raw.dropped_files.first().and_then(|f| f.path.clone())) {
             let dir = if p.is_dir() {
@@ -1051,6 +1174,19 @@ impl eframe::App for App {
                 {
                     self.gap = gap_for(self.compact);
                 }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .selectable_label(self.search.open, "🔍 Find")
+                        .on_hover_text("Find files by path (Ctrl+F)")
+                        .clicked()
+                    {
+                        if self.search.open {
+                            self.search.open = false;
+                        } else {
+                            self.search.open_dialog();
+                        }
+                    }
+                });
             });
             ui.add_space(3.0);
         });
@@ -1083,9 +1219,38 @@ impl eframe::App for App {
             ui.add_space(3.0);
         });
 
+        // What is left below the top bar: the search dialog hangs off its top right.
+        let avail = ctx.available_rect();
+
         egui::CentralPanel::default()
             .frame(egui::Frame::none().fill(Color32::from_gray(16)))
             .show(ctx, |ui| self.grid_ui(ui));
+
+        if self.viewer.is_none() {
+            let out = search::show(ctx, avail, &mut self.search);
+            if out.query_changed {
+                // Hits are recomputed next frame (they need the grid order);
+                // then we scroll to the current one.
+                self.search.dirty = true;
+                self.search_reveal = true;
+                ctx.request_repaint();
+            }
+            if out.close {
+                self.search.open = false;
+            }
+            let step = if out.step != 0 { out.step } else { key_step };
+            if step != 0 {
+                if let Some(id) = self.search.step(step) {
+                    self.reveal_item(id, true, ctx);
+                }
+            }
+            if self.search_reveal && !self.search.dirty {
+                self.search_reveal = false;
+                if let Some(id) = self.search.current_id() {
+                    self.reveal_item(id, true, ctx);
+                }
+            }
+        }
 
         self.viewer_ui(ctx);
     }

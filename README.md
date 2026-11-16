@@ -49,6 +49,8 @@ No ffmpeg dev libs? `cargo build --release --no-default-features` (no video thum
 - Columns slider, or Ctrl+scroll / pinch
 - Grouping: by folder / date modified / date created (day or month), always recursive
 - Compact checkbox (top bar) or `-C` / `--compact`: packs small groups side by side, each group gets its own gray shade, hover a tile to see its group name
+- Find: `Ctrl+F` or the 🔍 Find button (top right) opens a search box. It matches the path relative to the opened folder (sub directories included); the query is split into words and every word must occur, in any order, case-insensitive. Matches are outlined, everything else is dimmed. `Enter` / `Shift+Enter` (or `F3` / `Shift+F3`, or the ▲ ▼ buttons) jump to the next / previous hit, `Esc` closes it
+- Hover a tile to see its relative path
 - Click a tile for the viewer: Left/Right = prev/next, Esc = close, Enter = open in system player
 
 Cache lives in `~/.cache/gridview` (thumbnails + image sizes); delete it any time.
