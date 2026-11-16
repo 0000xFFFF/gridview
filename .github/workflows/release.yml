@@ -101,10 +101,6 @@ jobs:
     name: Windows x64
     runs-on: windows-latest
 
-    defaults:
-      run:
-        shell: msys2 {0}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -130,33 +126,56 @@ jobs:
         with:
           targets: x86_64-pc-windows-gnu
 
-      - name: Verify native dependencies
+      - name: Add Cargo to PATH
+        shell: pwsh
+        run: |
+          echo "$env:USERPROFILE\.cargo\bin" >> $env:GITHUB_PATH
+
+      - name: Verify toolchain
+        shell: msys2 {0}
+        run: |
+          export PATH="$USERPROFILE/.cargo/bin:$PATH"
+
+          cargo --version
+          rustc --version
+          gcc --version
+
+      - name: Verify native libraries
+        shell: msys2 {0}
         run: |
           pkg-config --modversion glib-2.0
           pkg-config --modversion gstreamer-1.0
           pkg-config --modversion gstreamer-app-1.0
           pkg-config --modversion gstreamer-video-1.0
           pkg-config --modversion libavcodec
-          gcc --version
+          pkg-config --modversion libavformat
 
       - name: Build GridView
+        shell: msys2 {0}
         env:
           CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
         run: |
+          export PATH="$USERPROFILE/.cargo/bin:$PATH"
+
           cargo build --release --target x86_64-pc-windows-gnu
 
       - name: Package Windows build
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
+
           Copy-Item target/x86_64-pc-windows-gnu/release/gridview.exe release/
-          Compress-Archive -Path release/* -DestinationPath gridview-windows-x64.zip
+
+          Compress-Archive `
+            -Path release/* `
+            -DestinationPath gridview-windows-x64.zip
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: gridview-windows-x64
           path: gridview-windows-x64.zip
+
 
   release:
     name: Publish GitHub Release
