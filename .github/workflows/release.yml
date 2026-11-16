@@ -98,10 +98,19 @@ jobs:
         shell: msys2 {0}
         run: |
           export LIBCLANG_PATH=/ucrt64/bin
-          export BINDGEN_EXTRA_CLANG_ARGS="--target=x86_64-w64-windows-gnu \
-            -D__AMXINTRIN_H -D__AMXTILEINTRIN_H -D__AMX_TILEINTRIN_H \
-            -D__AMXINT8INTRIN_H -D__AMXBF16INTRIN_H -D__AMXFP16INTRIN_H \
-            -D__AMXCOMPLEXINTRIN_H -D__AMXFP8INTRIN_H -D__AMXTF32INTRIN_H"
+
+          # clang's x86 AMX intrinsic headers leak into the ffmpeg bindings and
+          # produce Rust that can't compile. Pre-define each AMX header's include
+          # guard so clang skips them. Guards are read from the installed headers,
+          # so this works whatever clang version MSYS2 ships.
+          GUARDS=""
+          for f in /ucrt64/lib/clang/*/include/amx*.h; do
+            g=$(grep -m1 -oE '^#ifndef +__AMX[A-Z0-9_]*' "$f" | awk '{print $2}')
+            [ -n "$g" ] && GUARDS="$GUARDS -D$g"
+          done
+          echo "AMX guards:$GUARDS"
+
+          export BINDGEN_EXTRA_CLANG_ARGS="--target=x86_64-w64-windows-gnu $GUARDS"
           cargo build --release --locked
 
       # Ship the exe together with every MSYS2 DLL it links against,
