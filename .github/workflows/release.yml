@@ -98,7 +98,10 @@ jobs:
         shell: msys2 {0}
         run: |
           export LIBCLANG_PATH=/ucrt64/bin
-          export BINDGEN_EXTRA_CLANG_ARGS="--target=x86_64-w64-windows-gnu"
+          export BINDGEN_EXTRA_CLANG_ARGS="--target=x86_64-w64-windows-gnu \
+            -D__AMXINTRIN_H -D__AMXTILEINTRIN_H -D__AMX_TILEINTRIN_H \
+            -D__AMXINT8INTRIN_H -D__AMXBF16INTRIN_H -D__AMXFP16INTRIN_H \
+            -D__AMXCOMPLEXINTRIN_H -D__AMXFP8INTRIN_H -D__AMXTF32INTRIN_H"
           cargo build --release --locked
 
       # Ship the exe together with every MSYS2 DLL it links against,
