@@ -1,3 +1,1 @@
-- fix github actions
-- make first release (also build for windows)
 - update preview/preview.gif
