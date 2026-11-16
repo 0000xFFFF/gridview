@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=GridView
+Comment=Image and video viewer
+Exec=gridview %F
+Icon=gridview
+Terminal=false
+Categories=Graphics;Viewer;
+StartupNotify=true

@@ -2,63 +2,39 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Always run from the project root
 cd "$(dirname "$0")"
 
-APP_NAME="gridview"
-BINARY="target/release/$APP_NAME"
+APP="gridview"
+
+BINARY="target/release/$APP"
 ICON="assets/icon.png"
+DESKTOP="packaging/$APP.desktop"
 
-INSTALL_BIN="/usr/local/bin/$APP_NAME"
-ICON_DIR="$HOME/.local/share/icons/hicolor/512x512/apps"
-ICON_PATH="$ICON_DIR/$APP_NAME.png"
-DESKTOP_DIR="$HOME/.local/share/applications"
-DESKTOP_FILE="$DESKTOP_DIR/$APP_NAME.desktop"
+echo "==> Checking files..."
 
-echo "==> Building $APP_NAME..."
-cargo build --release
-
-# Verify build output
-if [[ ! -f "$BINARY" ]]; then
-    echo "Error: Release binary not found: $BINARY"
-    exit 1
-fi
-
-if [[ ! -f "$ICON" ]]; then
-    echo "Error: Application icon not found: $ICON"
-    exit 1
-fi
+for file in "$BINARY" "$ICON" "$DESKTOP"; do
+    if [[ ! -f "$file" ]]; then
+        echo "Error: Missing file: $file"
+        exit 1
+    fi
+done
 
 echo "==> Installing binary..."
-sudo install -Dm755 "$BINARY" "$INSTALL_BIN"
+sudo install -Dm755 "$BINARY" "/usr/local/bin/$APP"
 
 echo "==> Installing icon..."
-install -Dm644 "$ICON" "$ICON_PATH"
+install -Dm644 "$ICON" \
+    "$HOME/.local/share/icons/hicolor/512x512/apps/$APP.png"
 
-echo "==> Creating desktop entry..."
-mkdir -p "$DESKTOP_DIR"
-
-cat > "$DESKTOP_FILE" << EOF
-[Desktop Entry]
-Version=1.0
-Name=GridView
-Comment=Image and video viewer
-Exec=$INSTALL_BIN
-Icon=$APP_NAME
-Type=Application
-Terminal=false
-Categories=Graphics;Viewer;
-StartupNotify=true
-EOF
+echo "==> Installing desktop entry..."
+install -Dm644 "$DESKTOP" \
+    "$HOME/.local/share/applications/$APP.desktop"
 
 echo "==> Updating desktop database..."
 if command -v update-desktop-database &>/dev/null; then
-    update-desktop-database "$DESKTOP_DIR"
+    update-desktop-database "$HOME/.local/share/applications"
 fi
 
 echo
-echo "GridView successfully installed!"
-echo "Binary:  $INSTALL_BIN"
-echo "Icon:    $ICON_PATH"
-echo "Desktop: $DESKTOP_FILE"
+echo "$APP successfully installed!"
 
