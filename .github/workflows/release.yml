@@ -20,11 +20,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
+
           sudo apt-get install -y \
           build-essential \
           pkg-config \
           clang \
           libclang-dev \
+          libunwind-dev \
           libglib2.0-dev \
           libgtk-3-dev \
           libgstreamer1.0-dev \
@@ -37,6 +39,9 @@ jobs:
           libxkbcommon-dev \
           libwayland-dev \
           libgl1-mesa-dev
+
+          pkg-config --modversion glib-2.0
+          pkg-config --modversion gstreamer-1.0
 
       - name: Build
         run: cargo build --release --locked
