@@ -1,3 +1,4 @@
+- fix github actions
 - add finding files with CTRL+F add find button
 - make first release (also build for windows)
 - update preview/preview.gif
