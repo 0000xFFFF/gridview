@@ -959,13 +959,22 @@ fn gap_for(compact: bool) -> f32 {
     }
 }
 
-/// Background shade for a group's frame in compact mode. Cycles through a few
-/// clearly different dark grays so neighbouring groups can be told apart.
+/// Background shade for a group's frame in compact mode.
+/// Cycles through a variety of distinct, very dark colors.
 fn group_shade(g: u32) -> Color32 {
-    const SHADES: [u8; 4] = [26, 52, 78, 104];
-    Color32::from_gray(SHADES[g as usize % SHADES.len()])
-}
+    const SHADES: [Color32; 8] = [
+        Color32::from_rgb(35, 12, 55), // Dark purple
+        Color32::from_rgb(10, 20, 55), // Dark blue
+        Color32::from_rgb(8, 35, 22),  // Dark green
+        Color32::from_rgb(55, 25, 8), // Dark orange
+        Color32::from_rgb(55, 10, 18), // Dark red
+        Color32::from_rgb(10, 42, 48), // Dark teal
+        Color32::from_rgb(48, 35, 8), // Dark yellow / gold
+        Color32::from_rgb(40, 18, 32), // Dark pink
+    ];
 
+    SHADES[g as usize % SHADES.len()]
+}
 fn draw_play(p: &egui::Painter, c: Pos2, s: f32) {
     p.add(egui::Shape::convex_polygon(
         vec![
