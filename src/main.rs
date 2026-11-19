@@ -24,8 +24,8 @@ mod video;
 
 use chrono::{Datelike, Local, TimeZone};
 use eframe::egui::{
-    self, pos2, vec2, Align2, Color32, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Pos2, Rect, RichText, Sense,
-    Stroke, TextureHandle, TextureOptions, Vec2,
+    self, pos2, vec2, Align2, Color32, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Pos2,
+    Rect, RichText, Sense, Stroke, TextureHandle, TextureOptions, Vec2,
 };
 use layout::{Group, Layout, HEADER_H};
 use rayon::prelude::*;
@@ -197,6 +197,13 @@ fn open_external(path: &Path) {
         .args(["/C", "start", ""])
         .arg(path)
         .spawn();
+}
+
+fn copy_full_path(ctx: &egui::Context, path: &Path) {
+    let full = std::fs::canonicalize(path)
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| path.to_string_lossy().into_owned());
+    ctx.copy_text(full);
 }
 
 impl App {
@@ -560,11 +567,14 @@ impl App {
 
         // ---- zoom: wheel / pinch / + - 0 (the grid behind is not scrolled, see `update`)
         let screen = ctx.screen_rect();
+        let pad_bottom = if is_video { 115.0 } else { 5.0 };
         let fit = tex.as_ref().map(|t| {
             let ts = t.size_vec2();
-            let avail =
-                Rect::from_min_max(screen.min + vec2(24.0, 24.0), screen.max - vec2(24.0, 90.0))
-                    .size();
+            let avail = Rect::from_min_max(
+                pos2(screen.min.x + 5.0, screen.min.y),
+                pos2(screen.max.x - 5.0, screen.max.y - pad_bottom),
+            )
+            .size();
             ts * (avail.x / ts.x).min(avail.y / ts.y)
         });
         if let Some(fit) = fit {
@@ -612,24 +622,6 @@ impl App {
             Reveal,
         }
         let mut act = Act::None;
-
-        egui::Area::new(Id::new("viewer_controls"))
-            .order(egui::Order::Foreground)
-            .fixed_pos(pos2(ctx.screen_rect().right() - 3.0, 3.0))
-            .pivot(Align2::RIGHT_TOP)
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    if ui.button("📂 Show in folder").clicked() {
-                        act = Act::Reveal;
-                    }
-                    if ui.button("🚀 Open externally").clicked() {
-                        act = Act::External;
-                    }
-                    if ui.button("❌ Close").clicked() {
-                        act = Act::Close;
-                    }
-                });
-            });
 
         #[cfg(feature = "video-player")]
         if let Some(player) = v.player.as_mut() {
@@ -756,14 +748,6 @@ impl App {
                         Color32::GRAY,
                     );
                 }
-                let name = self.items[id as usize].path.to_string_lossy().into_owned();
-                p.text(
-                    pos2(3.0, 3.0),
-                    Align2::LEFT_TOP,
-                    name,
-                    FontId::proportional(13.0),
-                    Color32::from_gray(180),
-                );
 
                 #[cfg(feature = "video-player")]
                 let show_play = is_video
@@ -788,6 +772,10 @@ impl App {
                     }
                     if ui.button("📂 Show in folder").clicked() {
                         act = Act::Reveal;
+                        ui.close_menu();
+                    }
+                    if ui.button("📋 Copy path").clicked() {
+                        copy_full_path(ui.ctx(), &self.items[id as usize].path);
                         ui.close_menu();
                     }
                 });
@@ -1105,6 +1093,10 @@ impl App {
                     reveal_in_file_manager(&item.path);
                     ui.close_menu();
                 }
+                if ui.button("📋 Copy path").clicked() {
+                    copy_full_path(ui.ctx(), &item.path);
+                    ui.close_menu();
+                }
             });
             if resp.middle_clicked() {
                 reveal_in_file_manager(&item.path);
@@ -1140,7 +1132,11 @@ const FLASH_SECS: f32 = 1.2;
 fn paint_flash(p: &egui::Painter, r: Rect, t: f32) {
     let c = search::ACCENT;
     let hold = 0.6;
-    let fade = if t < hold { 1.0 } else { 1.0 - (t - hold) / (1.0 - hold) };
+    let fade = if t < hold {
+        1.0
+    } else {
+        1.0 - (t - hold) / (1.0 - hold)
+    };
     p.rect_filled(r, 0.0, c.gamma_multiply(0.2 * fade));
     p.rect_stroke(r, 0.0, Stroke::new(3.0_f32, c.gamma_multiply(fade)));
     let ease = 1.0 - (1.0 - t).powi(3);
@@ -1192,10 +1188,10 @@ fn group_shade(g: u32) -> Color32 {
         Color32::from_rgb(35, 12, 55), // Dark purple
         Color32::from_rgb(10, 20, 55), // Dark blue
         Color32::from_rgb(8, 35, 22),  // Dark green
-        Color32::from_rgb(55, 25, 8), // Dark orange
+        Color32::from_rgb(55, 25, 8),  // Dark orange
         Color32::from_rgb(55, 10, 18), // Dark red
         Color32::from_rgb(10, 42, 48), // Dark teal
-        Color32::from_rgb(48, 35, 8), // Dark yellow / gold
+        Color32::from_rgb(48, 35, 8),  // Dark yellow / gold
         Color32::from_rgb(40, 18, 32), // Dark pink
     ];
 
@@ -1622,13 +1618,29 @@ mod tests {
     fn zoom_is_limited_and_resets_pan_at_fit() {
         let fit = vec2(900.0, 700.0);
         let (mut z, mut pan) = (1.0, Vec2::ZERO);
-        zoom_at(&mut z, &mut pan, 1000.0, pos2(10.0, 10.0), screen(), fit, 8.0);
+        zoom_at(
+            &mut z,
+            &mut pan,
+            1000.0,
+            pos2(10.0, 10.0),
+            screen(),
+            fit,
+            8.0,
+        );
         assert_eq!(z, 8.0);
         // pan is within the image bounds
         let lim = (fit * 8.0 - screen().size()) * 0.5;
         assert!(pan.x.abs() <= lim.x + 1e-3 && pan.y.abs() <= lim.y + 1e-3);
         // zoom back out past fit: stays at 1.0 and centred
-        zoom_at(&mut z, &mut pan, 0.0001, pos2(10.0, 10.0), screen(), fit, 8.0);
+        zoom_at(
+            &mut z,
+            &mut pan,
+            0.0001,
+            pos2(10.0, 10.0),
+            screen(),
+            fit,
+            8.0,
+        );
         assert_eq!((z, pan), (1.0, Vec2::ZERO));
     }
 }
