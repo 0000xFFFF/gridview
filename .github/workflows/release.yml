@@ -50,6 +50,7 @@ jobs:
           cp packaging/gridview.desktop "$DIR/share/applications/"
           cp assets/icon.png "$DIR/share/icons/hicolor/256x256/apps/gridview.png"
           cp README.md LICENSE "$DIR/"
+          install -m755 install.sh uninstall.sh "$DIR/"
 
           tar -czf "${DIR}-${VERSION}.tar.gz" "$DIR"
 
