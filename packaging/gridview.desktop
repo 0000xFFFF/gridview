@@ -7,4 +7,5 @@ Exec=gridview %F
 Icon=gridview
 Terminal=false
 Categories=Graphics;Viewer;
+MimeType=image/jpeg;image/png;image/gif;image/bmp;image/webp;image/tiff;video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/x-m4v;video/x-ms-wmv;video/x-flv;video/mpeg;video/mp2t;video/3gpp;
 StartupNotify=true
