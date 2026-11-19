@@ -1,6 +1,6 @@
 [package]
 name = "gridview"
-version = "3.12.0"
+version = "3.13.0"
 edition = "2021"
 description = "Fast masonry image/video gallery (Rust rewrite)"
 
