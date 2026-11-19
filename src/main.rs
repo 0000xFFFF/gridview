@@ -60,6 +60,13 @@ struct Viewer {
 
     #[cfg(feature = "video-player")]
     video_tex: Option<TextureHandle>,
+
+    /// Show/hide logic of the video transport bar.
+    #[cfg(feature = "video-player")]
+    autohide: utils::AutoHide,
+    /// Where the transport bar was drawn last frame (None while hidden).
+    #[cfg(feature = "video-player")]
+    transport_rect: Option<Rect>,
 }
 
 struct App {
@@ -445,6 +452,10 @@ impl App {
 
             #[cfg(feature = "video-player")]
             video_tex: None,
+            #[cfg(feature = "video-player")]
+            autohide: utils::AutoHide::new(Instant::now()),
+            #[cfg(feature = "video-player")]
+            transport_rect: None,
         });
     }
 
@@ -542,11 +553,31 @@ impl App {
 
             let screen = ctx.screen_rect();
 
-            egui::Area::new(Id::new("viewer_transport"))
+            // Controls only show while the mouse moves (or rests on them).
+            let (moved, pointer, down) = ctx.input(|i| {
+                (
+                    i.pointer.delta() != Vec2::ZERO,
+                    i.pointer.hover_pos(),
+                    i.pointer.any_down(),
+                )
+            });
+            let over = matches!((pointer, v.transport_rect), (Some(p), Some(r)) if r.contains(p));
+            let now = Instant::now();
+            let show = v.autohide.update(now, moved, over, down);
+            if show {
+                ctx.request_repaint_after(v.autohide.time_left(now));
+            }
+            let fade = ctx.animate_bool_with_time(Id::new("viewer_transport_fade"), show, 0.18);
+
+            let area = egui::Area::new(Id::new("viewer_transport"))
                 .order(egui::Order::Foreground)
                 .fixed_pos(pos2(screen.center().x, screen.bottom() - 10.0))
                 .pivot(Align2::CENTER_BOTTOM)
                 .show(ctx, |ui| {
+                    if fade <= 0.0 {
+                        return; // fully hidden: no widgets, so nothing to hover or click
+                    }
+                    ui.set_opacity(fade);
                     egui::Frame::popup(ui.style()).show(ui, |ui| {
                         ui.horizontal(|ui| {
                             let button_size = egui::vec2(28.0, 28.0);
@@ -615,6 +646,7 @@ impl App {
                         });
                     });
                 });
+            v.transport_rect = (fade > 0.0).then_some(area.response.rect);
         }
 
         egui::Area::new(Id::new("viewer"))

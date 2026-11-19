@@ -8,6 +8,7 @@ use chrono::{Datelike, Local, TimeZone};
 use eframe::egui::{self, pos2, vec2, Color32, Pos2, Rect, Stroke, Vec2};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 pub fn setup_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
@@ -123,6 +124,44 @@ pub fn paint_flash(p: &egui::Painter, r: Rect, t: f32) {
         4.0 + 8.0 * ease,
         Stroke::new(2.0_f32, c.gamma_multiply(0.7 * (1.0 - t))),
     );
+}
+
+/// Decides when overlay controls (the video transport bar) are visible: shown
+/// while the pointer is moving, kept for [`AutoHide::DELAY`] after it stops, and
+/// never hidden while the pointer is over them - nor while a button that was
+/// pressed on them is still held (dragging a slider off the bar).
+#[cfg_attr(not(feature = "video-player"), allow(dead_code))]
+pub struct AutoHide {
+    last_move: Instant,
+    held: bool,
+}
+
+#[cfg_attr(not(feature = "video-player"), allow(dead_code))]
+impl AutoHide {
+    pub const DELAY: Duration = Duration::from_millis(200);
+
+    pub fn new(now: Instant) -> Self {
+        Self {
+            last_move: now,
+            held: false,
+        }
+    }
+
+    /// Call once per frame. `moved`: the pointer moved this frame, `over`: it is
+    /// over the controls, `down`: a pointer button is held. Returns whether the
+    /// controls should be shown.
+    pub fn update(&mut self, now: Instant, moved: bool, over: bool, down: bool) -> bool {
+        if moved {
+            self.last_move = now;
+        }
+        self.held = over || (self.held && down);
+        self.held || now.saturating_duration_since(self.last_move) < Self::DELAY
+    }
+
+    /// How long until the controls hide if nothing happens (for scheduling a repaint).
+    pub fn time_left(&self, now: Instant) -> Duration {
+        Self::DELAY.saturating_sub(now.saturating_duration_since(self.last_move))
+    }
 }
 
 /// Largest size with the aspect ratio of `size` that fits inside `avail`.
@@ -266,6 +305,75 @@ mod tests {
 
     fn screen() -> Rect {
         Rect::from_min_size(Pos2::ZERO, vec2(1000.0, 800.0))
+    }
+
+    #[test]
+    fn controls_hide_when_the_pointer_is_still_and_show_on_movement() {
+        let t0 = Instant::now();
+        let ms = |n| t0 + Duration::from_millis(n);
+        let mut h = AutoHide::new(t0);
+        assert!(
+            h.update(ms(0), false, false, false),
+            "visible right after opening"
+        );
+        assert!(
+            h.update(ms(1000), false, false, false),
+            "still within the delay"
+        );
+        assert!(
+            !h.update(ms(1600), false, false, false),
+            "hidden once stationary"
+        );
+        assert!(!h.update(ms(60_000), false, false, false), "stays hidden");
+        assert!(
+            h.update(ms(60_010), true, false, false),
+            "moving brings it back"
+        );
+        assert!(h.update(ms(61_000), false, false, false));
+        assert!(
+            !h.update(ms(61_600), false, false, false),
+            "and it hides again"
+        );
+    }
+
+    #[test]
+    fn controls_stay_while_the_pointer_is_over_them() {
+        let t0 = Instant::now();
+        let ms = |n| t0 + Duration::from_millis(n);
+        let mut h = AutoHide::new(t0);
+        // resting on the bar for a long time: never hides
+        for i in 0..100 {
+            assert!(h.update(ms(2000 + i * 1000), false, true, false));
+        }
+        // leaving it (a move) starts the countdown from that moment
+        assert!(h.update(ms(103_000), true, false, false));
+        assert!(!h.update(ms(103_000) + AutoHide::DELAY, false, false, false));
+    }
+
+    #[test]
+    fn dragging_a_slider_off_the_bar_keeps_the_controls() {
+        let t0 = Instant::now();
+        let ms = |n| t0 + Duration::from_millis(n);
+        let mut h = AutoHide::new(t0);
+        assert!(h.update(ms(5000), false, true, true), "pressed on the bar");
+        // pointer wanders off the bar but the button is still down, without moving much
+        assert!(h.update(ms(9000), false, false, true));
+        assert!(h.update(ms(20_000), false, false, true));
+        // released: the countdown applies again (last move was long ago)
+        assert!(!h.update(ms(20_100), false, false, false));
+    }
+
+    #[test]
+    fn time_left_counts_down_to_zero() {
+        let t0 = Instant::now();
+        let mut h = AutoHide::new(t0);
+        h.update(t0, true, false, false);
+        assert_eq!(h.time_left(t0), AutoHide::DELAY);
+        assert_eq!(
+            h.time_left(t0 + Duration::from_millis(500)),
+            Duration::from_millis(1000)
+        );
+        assert_eq!(h.time_left(t0 + Duration::from_secs(10)), Duration::ZERO);
     }
 
     #[test]
