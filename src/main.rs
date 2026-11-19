@@ -287,6 +287,10 @@ impl App {
     }
 
     fn open_dir(&mut self, root: PathBuf, ctx: &egui::Context) {
+
+        let title = format!("gridview - {}", root.to_string_lossy());
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
+
         self.reset_state(root.clone());
         self.scanning = true;
         self.scan = Some(scan::spawn_scan(root, ctx.clone()));
@@ -513,6 +517,10 @@ impl App {
             let _ = tx.send(ci);
             c.request_repaint();
         });
+
+        let title = format!("gridview - {}", path.to_string_lossy());
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
+
         self.viewer = Some(Viewer {
             id,
             tex: None,
@@ -844,6 +852,10 @@ impl App {
                     self.open_dir(dir, ctx);
                     self.pending_reveal = Some(file);
                 }
+                ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
+                    "gridview - {}",
+                    self.root.to_string_lossy()
+                )));
             }
             Act::Close => {
                 let y = self.layout.y_of.get(id as usize).copied().unwrap_or(0.0);
@@ -851,6 +863,10 @@ impl App {
                     self.scroll_target = Some(((y - self.view_h * 0.3).max(0.0), 1));
                 }
                 self.viewer = None;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
+                    "gridview - {}",
+                    self.root.to_string_lossy()
+                )));
             }
             Act::Step(d) => {
                 let pos = self.order_pos[id as usize] as i32 + d;
