@@ -125,16 +125,9 @@ pub fn paint_flash(p: &egui::Painter, r: Rect, t: f32) {
     );
 }
 
-/// Height of the video transport bar strip at the bottom of the viewer.
-pub const VIDEO_BAR_H: f32 = 115.0;
-
-/// The part of the screen the viewer image is fitted into and centred on.
-/// For a video that is everything above the transport bar, so the picture sits
-/// flush with the top instead of being centred on the full screen (which left
-/// a gap above it equal to half the bar's height).
-pub fn viewer_view(screen: Rect, is_video: bool) -> Rect {
-    let bar = if is_video { VIDEO_BAR_H } else { 0.0 };
-    Rect::from_min_max(screen.min, pos2(screen.max.x, screen.max.y - bar))
+/// Largest size with the aspect ratio of `size` that fits inside `avail`.
+pub fn fit_within(size: Vec2, avail: Vec2) -> Vec2 {
+    size * (avail.x / size.x).min(avail.y / size.y)
 }
 
 /// Keep the zoomed image from being dragged away: while it is larger than the
@@ -276,18 +269,25 @@ mod tests {
     }
 
     #[test]
-    fn video_view_excludes_the_bar_and_has_no_top_gap() {
+    fn fitted_image_stays_inside_the_screen_when_centred_on_it() {
+        // Regression: sizing to the whole screen but centring on something
+        // other than the screen centre pushed the picture off the top edge.
         let scr = screen();
-        // images: the whole screen, as before
-        assert_eq!(viewer_view(scr, false), scr);
-        // video: everything above the transport bar
-        let v = viewer_view(scr, true);
-        assert_eq!(v.min, scr.min);
-        assert_eq!(v.max, pos2(scr.max.x, scr.max.y - VIDEO_BAR_H));
-        // a video that fills the height is flush with the top and the bar
-        let r = Rect::from_center_size(v.center(), vec2(600.0, v.height()));
-        assert_eq!(r.top(), scr.top());
-        assert_eq!(r.bottom(), scr.bottom() - VIDEO_BAR_H);
+        for size in [vec2(1920.0, 1080.0), vec2(1080.0, 1920.0), vec2(50.0, 50.0)] {
+            let fit = fit_within(size, scr.size());
+            assert!(
+                (fit.x / fit.y - size.x / size.y).abs() < 1e-4,
+                "aspect kept"
+            );
+            let r = Rect::from_center_size(scr.center(), fit);
+            assert!(r.min.x >= scr.min.x - 1e-3 && r.min.y >= scr.min.y - 1e-3);
+            assert!(r.max.x <= scr.max.x + 1e-3 && r.max.y <= scr.max.y + 1e-3);
+            // and it fills the screen in at least one direction
+            assert!(
+                (fit.x - scr.width()).abs() < 1e-3 || (fit.y - scr.height()).abs() < 1e-3,
+                "{fit:?}"
+            );
+        }
     }
 
     #[test]

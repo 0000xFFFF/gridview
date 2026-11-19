@@ -37,8 +37,8 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
 use thumbs::{Req, Thumbs};
 use utils::{
-    build_groups, clamp_pan, copy_full_path, draw_play, gap_for, group_shade, open_external,
-    paint_flash, reveal_in_file_manager, setup_fonts, viewer_view, zoom_at, FLASH_SECS,
+    build_groups, clamp_pan, copy_full_path, draw_play, fit_within, gap_for, group_shade,
+    open_external, paint_flash, reveal_in_file_manager, setup_fonts, zoom_at, FLASH_SECS,
 };
 
 struct Viewer {
@@ -485,14 +485,11 @@ impl App {
 
         // zoom: wheel / pinch / + - 0 (the grid behind is not scrolled, see `update`)
         let screen = ctx.screen_rect();
-        // Where the image lives: the whole screen, or for video the strip above
-        // the transport bar (so the video sits flush with the top).
-        let view = viewer_view(screen, is_video);
-        let fit = tex.as_ref().map(|t| {
-            let ts = t.size_vec2();
-            let avail = screen.size();
-            ts * (avail.x / ts.x).min(avail.y / ts.y)
-        });
+        // Image and video both fill the window and are centred on it; the video
+        // transport bar floats over the bottom edge.
+        let fit = tex
+            .as_ref()
+            .map(|t| fit_within(t.size_vec2(), screen.size()));
         if let Some(fit) = fit {
             let it = &self.items[id as usize];
             let native_w = if it.w > 0 { it.w as f32 } else { fit.x };
@@ -522,8 +519,8 @@ impl App {
                     &mut v.zoom,
                     &mut v.pan,
                     k,
-                    pointer.unwrap_or(view.center()),
-                    view,
+                    pointer.unwrap_or(screen.center()),
+                    screen,
                     fit,
                     max_zoom,
                 );
@@ -630,7 +627,7 @@ impl App {
                     if zoomed && resp.dragged_by(PointerButton::Primary) {
                         v.pan += resp.drag_delta();
                     }
-                    v.pan = clamp_pan(v.pan, fit * v.zoom, view.size());
+                    v.pan = clamp_pan(v.pan, fit * v.zoom, screen.size());
                 }
                 // normal cursor, a hand once there is something to move around
                 if zoomed {
@@ -648,7 +645,7 @@ impl App {
                 p.rect_filled(screen, 0.0, Color32::from_black_alpha(242));
                 if let Some(t) = &tex {
                     let size = fit.unwrap_or(t.size_vec2()) * v.zoom;
-                    let r = Rect::from_center_size(view.center() + v.pan, size);
+                    let r = Rect::from_center_size(screen.center() + v.pan, size);
                     p.image(
                         t.id(),
                         r,
@@ -657,7 +654,7 @@ impl App {
                     );
                 } else {
                     p.text(
-                        view.center(),
+                        screen.center(),
                         Align2::CENTER_CENTER,
                         "Loading…",
                         FontId::proportional(18.0),
@@ -675,7 +672,7 @@ impl App {
                 let show_play = is_video;
 
                 if show_play {
-                    let c = view.center();
+                    let c = screen.center();
                     p.circle_filled(c, 38.0, Color32::from_black_alpha(170));
                     draw_play(p, c, 18.0);
                 }
