@@ -1,1 +1,3 @@
+- need to clean up code
+    - move all until type of function to util.rs
 - update preview/preview.gif
