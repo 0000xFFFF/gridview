@@ -18,11 +18,11 @@ use config::AppConfig;
 mod scan;
 mod search;
 mod thumbs;
+mod utils;
 
 #[cfg(feature = "video-thumbnails")]
 mod video;
 
-use chrono::{Datelike, Local, TimeZone};
 use eframe::egui::{
     self, pos2, vec2, Align2, Color32, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Pos2,
     Rect, RichText, Sense, Stroke, TextureHandle, TextureOptions, Vec2,
@@ -30,12 +30,16 @@ use eframe::egui::{
 use layout::{Group, Layout, HEADER_H};
 use rayon::prelude::*;
 use scan::{Item, Kind, ScanHandle, ScanMsg};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
 use thumbs::{Req, Thumbs};
+use utils::{
+    build_groups, clamp_pan, copy_full_path, draw_play, gap_for, group_shade, open_external,
+    paint_flash, reveal_in_file_manager, setup_fonts, viewer_view, zoom_at, FLASH_SECS,
+};
 
 struct Viewer {
     id: u32,
@@ -110,100 +114,6 @@ struct App {
     flash: Option<(u32, Instant)>,
     /// Mouse wheel delta taken away from the grid while the viewer is open.
     viewer_scroll: f32,
-}
-
-fn setup_fonts(ctx: &egui::Context) {
-    let mut fonts = egui::FontDefinitions::default();
-
-    fonts.font_data.insert(
-        "departure_mono".to_owned(),
-        egui::FontData::from_static(include_bytes!(
-            "../assets/fonts/DepartureMonoNerdFontMono-Regular.otf"
-        )),
-    );
-
-    fonts
-        .families
-        .entry(egui::FontFamily::Proportional)
-        .or_default()
-        .insert(0, "departure_mono".to_owned());
-
-    fonts
-        .families
-        .entry(egui::FontFamily::Monospace)
-        .or_default()
-        .insert(0, "departure_mono".to_owned());
-
-    ctx.set_fonts(fonts);
-}
-
-fn reveal_in_file_manager(path: &Path) {
-    use std::process::Command;
-
-    #[cfg(target_os = "windows")]
-    {
-        let _ = Command::new("explorer.exe")
-            .arg(format!("/select,{}", path.display()))
-            .spawn();
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let _ = Command::new("open").arg("-R").arg(path).spawn();
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let desktop = std::env::var("XDG_CURRENT_DESKTOP")
-            .unwrap_or_default()
-            .to_lowercase();
-
-        // Prefer the file manager native to the current desktop.
-        let preferred: &[&str] = if desktop.contains("kde") || desktop.contains("plasma") {
-            &["dolphin", "thunar", "nemo", "nautilus", "caja"]
-        } else if desktop.contains("xfce") {
-            &["thunar", "dolphin", "nemo", "nautilus", "caja"]
-        } else if desktop.contains("gnome") {
-            &["nautilus", "dolphin", "thunar", "nemo", "caja"]
-        } else if desktop.contains("cinnamon") {
-            &["nemo", "dolphin", "thunar", "nautilus", "caja"]
-        } else if desktop.contains("mate") {
-            &["caja", "thunar", "dolphin", "nemo", "nautilus"]
-        } else {
-            &["dolphin", "thunar", "nemo", "nautilus", "caja"]
-        };
-
-        for manager in preferred {
-            if Command::new(manager)
-                .arg("--select")
-                .arg(path)
-                .spawn()
-                .is_ok()
-            {
-                break;
-            }
-        }
-    }
-}
-
-fn open_external(path: &Path) {
-    use std::process::Command;
-    #[cfg(target_os = "linux")]
-    let _ = Command::new("xdg-open").arg(path).spawn();
-    #[cfg(target_os = "macos")]
-    let _ = Command::new("open").arg(path).spawn();
-    #[cfg(target_os = "windows")]
-    let _ = Command::new("cmd")
-        .args(["/C", "start", ""])
-        .arg(path)
-        .spawn();
-}
-
-fn copy_full_path(ctx: &egui::Context, path: &Path) {
-    let full = std::fs::canonicalize(path)
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| path.to_string_lossy().into_owned());
-    ctx.copy_text(full);
 }
 
 impl App {
@@ -573,16 +483,14 @@ impl App {
         #[cfg(not(feature = "video-player"))]
         let tex = v.tex.clone().or_else(|| v.fallback.clone());
 
-        // ---- zoom: wheel / pinch / + - 0 (the grid behind is not scrolled, see `update`)
+        // zoom: wheel / pinch / + - 0 (the grid behind is not scrolled, see `update`)
         let screen = ctx.screen_rect();
-        let pad_bottom = if is_video { 115.0 } else { 5.0 };
+        // Where the image lives: the whole screen, or for video the strip above
+        // the transport bar (so the video sits flush with the top).
+        let view = viewer_view(screen, is_video);
         let fit = tex.as_ref().map(|t| {
             let ts = t.size_vec2();
-            let avail = Rect::from_min_max(
-                pos2(screen.min.x + 5.0, screen.min.y),
-                pos2(screen.max.x - 5.0, screen.max.y - pad_bottom),
-            )
-            .size();
+            let avail = screen.size();
             ts * (avail.x / ts.x).min(avail.y / ts.y)
         });
         if let Some(fit) = fit {
@@ -614,8 +522,8 @@ impl App {
                     &mut v.zoom,
                     &mut v.pan,
                     k,
-                    pointer.unwrap_or(screen.center()),
-                    screen,
+                    pointer.unwrap_or(view.center()),
+                    view,
                     fit,
                     max_zoom,
                 );
@@ -722,7 +630,7 @@ impl App {
                     if zoomed && resp.dragged_by(PointerButton::Primary) {
                         v.pan += resp.drag_delta();
                     }
-                    v.pan = clamp_pan(v.pan, fit * v.zoom, screen.size());
+                    v.pan = clamp_pan(v.pan, fit * v.zoom, view.size());
                 }
                 // normal cursor, a hand once there is something to move around
                 if zoomed {
@@ -740,7 +648,7 @@ impl App {
                 p.rect_filled(screen, 0.0, Color32::from_black_alpha(242));
                 if let Some(t) = &tex {
                     let size = fit.unwrap_or(t.size_vec2()) * v.zoom;
-                    let r = Rect::from_center_size(screen.center() + v.pan, size);
+                    let r = Rect::from_center_size(view.center() + v.pan, size);
                     p.image(
                         t.id(),
                         r,
@@ -749,7 +657,7 @@ impl App {
                     );
                 } else {
                     p.text(
-                        screen.center(),
+                        view.center(),
                         Align2::CENTER_CENTER,
                         "Loading…",
                         FontId::proportional(18.0),
@@ -767,7 +675,7 @@ impl App {
                 let show_play = is_video;
 
                 if show_play {
-                    let c = screen.center();
+                    let c = view.center();
                     p.circle_filled(c, 38.0, Color32::from_black_alpha(170));
                     draw_play(p, c, 18.0);
                 }
@@ -1141,158 +1049,6 @@ impl App {
     }
 }
 
-const FLASH_SECS: f32 = 1.2;
-
-/// "Here it is": a bright frame that holds for a moment, fades out, and sends
-/// a ring outwards. `t` runs 0..1 over the flash.
-fn paint_flash(p: &egui::Painter, r: Rect, t: f32) {
-    let c = search::ACCENT;
-    let hold = 0.6;
-    let fade = if t < hold {
-        1.0
-    } else {
-        1.0 - (t - hold) / (1.0 - hold)
-    };
-    p.rect_filled(r, 0.0, c.gamma_multiply(0.2 * fade));
-    p.rect_stroke(r, 0.0, Stroke::new(3.0_f32, c.gamma_multiply(fade)));
-    let ease = 1.0 - (1.0 - t).powi(3);
-    p.rect_stroke(
-        r.expand(2.0 + 22.0 * ease),
-        4.0 + 8.0 * ease,
-        Stroke::new(2.0_f32, c.gamma_multiply(0.7 * (1.0 - t))),
-    );
-}
-
-/// Keep the zoomed image from being dragged away: while it is larger than the
-/// window it may only move until its edge meets the window edge, otherwise it
-/// stays centred.
-fn clamp_pan(pan: Vec2, size: Vec2, view: Vec2) -> Vec2 {
-    let lim = ((size - view) * 0.5).max(Vec2::ZERO);
-    vec2(pan.x.clamp(-lim.x, lim.x), pan.y.clamp(-lim.y, lim.y))
-}
-
-/// Zoom the viewer image by factor `k`, keeping the point under `anchor` fixed.
-fn zoom_at(
-    zoom: &mut f32,
-    pan: &mut Vec2,
-    k: f32,
-    anchor: Pos2,
-    screen: Rect,
-    fit: Vec2,
-    max_zoom: f32,
-) {
-    let z = (*zoom * k).clamp(1.0, max_zoom);
-    let k = z / *zoom;
-    let rel = anchor - screen.center();
-    *pan = rel - (rel - *pan) * k;
-    *zoom = z;
-    *pan = clamp_pan(*pan, fit * z, screen.size());
-}
-
-fn gap_for(compact: bool) -> f32 {
-    if compact {
-        8.0
-    } else {
-        4.0
-    }
-}
-
-/// Background shade for a group's frame in compact mode.
-/// Cycles through a variety of distinct, very dark colors.
-fn group_shade(g: u32) -> Color32 {
-    const SHADES: [Color32; 8] = [
-        Color32::from_rgb(35, 12, 55), // Dark purple
-        Color32::from_rgb(10, 20, 55), // Dark blue
-        Color32::from_rgb(8, 35, 22),  // Dark green
-        Color32::from_rgb(55, 25, 8),  // Dark orange
-        Color32::from_rgb(55, 10, 18), // Dark red
-        Color32::from_rgb(10, 42, 48), // Dark teal
-        Color32::from_rgb(48, 35, 8),  // Dark yellow / gold
-        Color32::from_rgb(40, 18, 32), // Dark pink
-    ];
-
-    SHADES[g as usize % SHADES.len()]
-}
-fn draw_play(p: &egui::Painter, c: Pos2, s: f32) {
-    p.add(egui::Shape::convex_polygon(
-        vec![
-            pos2(c.x - s * 0.5, c.y - s * 0.7),
-            pos2(c.x - s * 0.5, c.y + s * 0.7),
-            pos2(c.x + s * 0.8, c.y),
-        ],
-        Color32::from_white_alpha(230),
-        Stroke::NONE,
-    ));
-}
-
-fn build_groups(items: &[Item], mode: GroupMode, gran: DateGran, root: &Path) -> Vec<Group> {
-    match mode {
-        GroupMode::Folder => {
-            let mut m: BTreeMap<PathBuf, Vec<u32>> = BTreeMap::new();
-            for (i, it) in items.iter().enumerate() {
-                m.entry(it.path.parent().unwrap_or(Path::new("")).to_path_buf())
-                    .or_default()
-                    .push(i as u32);
-            }
-            m.into_iter()
-                .map(|(dir, mut ids)| {
-                    ids.sort_by_cached_key(|&i| {
-                        items[i as usize]
-                            .path
-                            .file_name()
-                            .map(|n| n.to_string_lossy().to_lowercase())
-                    });
-                    let rel = dir.strip_prefix(root).unwrap_or(&dir);
-                    let label = if rel.as_os_str().is_empty() {
-                        root.file_name()
-                            .map(|n| n.to_string_lossy().into_owned())
-                            .unwrap_or_else(|| root.to_string_lossy().into_owned())
-                    } else {
-                        rel.to_string_lossy().into_owned()
-                    };
-                    Group { label, ids }
-                })
-                .collect()
-        }
-        GroupMode::Modified | GroupMode::Created => {
-            let ts = |it: &Item| {
-                if mode == GroupMode::Modified {
-                    it.modified
-                } else {
-                    it.created
-                }
-            };
-            let mut m: BTreeMap<i32, (String, Vec<u32>)> = BTreeMap::new();
-            for (i, it) in items.iter().enumerate() {
-                let Some(dt) = Local.timestamp_opt(ts(it), 0).single() else {
-                    continue;
-                };
-                let (key, label) = match gran {
-                    DateGran::Day => (
-                        dt.year() * 10000 + dt.month() as i32 * 100 + dt.day() as i32,
-                        dt.format("%a, %b %-d, %Y").to_string(),
-                    ),
-                    DateGran::Month => (
-                        dt.year() * 100 + dt.month() as i32,
-                        dt.format("%B %Y").to_string(),
-                    ),
-                };
-                m.entry(key)
-                    .or_insert_with(|| (label, vec![]))
-                    .1
-                    .push(i as u32);
-            }
-            m.into_values()
-                .rev()
-                .map(|(label, mut ids)| {
-                    ids.sort_by_key(|&i| std::cmp::Reverse(ts(&items[i as usize])));
-                    Group { label, ids }
-                })
-                .collect()
-        }
-    }
-}
-
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.poll_scan();
@@ -1595,68 +1351,4 @@ fn main() -> eframe::Result<()> {
         opts,
         Box::new(move |cc| Box::new(App::new(cc, config))),
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn screen() -> Rect {
-        Rect::from_min_size(Pos2::ZERO, vec2(1000.0, 800.0))
-    }
-
-    #[test]
-    fn clamp_pan_centres_small_and_limits_large() {
-        // smaller than the window: always centred
-        assert_eq!(
-            clamp_pan(vec2(50.0, -20.0), vec2(600.0, 400.0), vec2(1000.0, 800.0)),
-            Vec2::ZERO
-        );
-        // 2000 wide in a 1000 window: may move 500 either way; height still centred
-        let p = clamp_pan(vec2(900.0, 300.0), vec2(2000.0, 700.0), vec2(1000.0, 800.0));
-        assert_eq!(p, vec2(500.0, 0.0));
-    }
-
-    #[test]
-    fn zoom_keeps_the_point_under_the_cursor_fixed() {
-        let fit = vec2(900.0, 700.0);
-        let (mut z, mut pan) = (1.0, Vec2::ZERO);
-        let anchor = pos2(650.0, 300.0);
-        // image point under the cursor before zooming (relative to image centre)
-        let before = (anchor - screen().center() - pan) / z;
-        zoom_at(&mut z, &mut pan, 3.0, anchor, screen(), fit, 64.0);
-        assert!((z - 3.0).abs() < 1e-5);
-        let after = (anchor - screen().center() - pan) / z;
-        assert!((before - after).length() < 1e-3, "{before:?} vs {after:?}");
-    }
-
-    #[test]
-    fn zoom_is_limited_and_resets_pan_at_fit() {
-        let fit = vec2(900.0, 700.0);
-        let (mut z, mut pan) = (1.0, Vec2::ZERO);
-        zoom_at(
-            &mut z,
-            &mut pan,
-            1000.0,
-            pos2(10.0, 10.0),
-            screen(),
-            fit,
-            8.0,
-        );
-        assert_eq!(z, 8.0);
-        // pan is within the image bounds
-        let lim = (fit * 8.0 - screen().size()) * 0.5;
-        assert!(pan.x.abs() <= lim.x + 1e-3 && pan.y.abs() <= lim.y + 1e-3);
-        // zoom back out past fit: stays at 1.0 and centred
-        zoom_at(
-            &mut z,
-            &mut pan,
-            0.0001,
-            pos2(10.0, 10.0),
-            screen(),
-            fit,
-            8.0,
-        );
-        assert_eq!((z, pan), (1.0, Vec2::ZERO));
-    }
 }
