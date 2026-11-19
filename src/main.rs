@@ -24,8 +24,8 @@ mod video;
 
 use chrono::{Datelike, Local, TimeZone};
 use eframe::egui::{
-    self, pos2, vec2, Align2, Color32, FontId, Id, Key, Modifiers, Pos2, Rect, RichText, Sense,
-    Stroke, TextureHandle, TextureOptions,
+    self, pos2, vec2, Align2, Color32, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Pos2, Rect, RichText, Sense,
+    Stroke, TextureHandle, TextureOptions, Vec2,
 };
 use layout::{Group, Layout, HEADER_H};
 use rayon::prelude::*;
@@ -33,7 +33,7 @@ use scan::{Item, Kind, ScanHandle, ScanMsg};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
 use thumbs::{Req, Thumbs};
 
@@ -42,6 +42,14 @@ struct Viewer {
     tex: Option<TextureHandle>,
     fallback: Option<TextureHandle>,
     rx: Receiver<Option<egui::ColorImage>>,
+    /// Kept so a sharper decode can be requested once the user zooms in.
+    tx: Sender<Option<egui::ColorImage>>,
+    /// Longest side (px) of the image currently decoded for the viewer.
+    edge: u32,
+    /// 1.0 = fit to window. Above that the image is zoomed and can be panned.
+    zoom: f32,
+    /// Offset of the image centre from the screen centre, in points.
+    pan: Vec2,
 
     #[cfg(feature = "video-player")]
     player: Option<player::Player>,
@@ -93,6 +101,15 @@ struct App {
     rel_lc: Vec<String>,
     /// Scroll to the current hit once the hits have been recomputed.
     search_reveal: bool,
+
+    /// Single file mode: the file shown on its own, the folder is not scanned yet.
+    single_file: Option<PathBuf>,
+    /// File to scroll to (and flash) once the folder scan has produced a layout.
+    pending_reveal: Option<PathBuf>,
+    /// Tile that is briefly highlighted, and when that started.
+    flash: Option<(u32, Instant)>,
+    /// Mouse wheel delta taken away from the grid while the viewer is open.
+    viewer_scroll: f32,
 }
 
 fn setup_fonts(ctx: &egui::Context) {
@@ -223,12 +240,23 @@ impl App {
             search: search::Search::default(),
             rel_lc: vec![],
             search_reveal: false,
+            single_file: None,
+            pending_reveal: None,
+            flash: None,
+            viewer_scroll: 0.0,
         };
-        app.open_dir(config.root, &ctx);
+        match config.single_file {
+            Some(file) => app.open_single(file, &ctx),
+            None => app.open_dir(config.root, &ctx),
+        }
         app
     }
 
-    fn open_dir(&mut self, root: PathBuf, ctx: &egui::Context) {
+    /// Forget everything about the previous folder / file.
+    fn reset_state(&mut self, root: PathBuf) {
+        self.pending_reveal = None;
+        self.flash = None;
+        self.single_file = None;
         self.path_input = root.to_string_lossy().into_owned();
         self.root = root.clone();
         self.items.clear();
@@ -247,8 +275,31 @@ impl App {
         self.dims_done = 0;
         self.scroll_y = 0.0;
         self.scroll_target = Some((0.0, 1));
+        self.scanning = false;
+        self.scan = None;
+    }
+
+    fn open_dir(&mut self, root: PathBuf, ctx: &egui::Context) {
+        self.reset_state(root.clone());
         self.scanning = true;
         self.scan = Some(scan::spawn_scan(root, ctx.clone()));
+    }
+
+    /// Single file mode: show just this file in the viewer. The folder is only
+    /// scanned once the viewer is closed (see `Act::Close`).
+    fn open_single(&mut self, file: PathBuf, ctx: &egui::Context) {
+        let dir = file
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.root.clone());
+        let Some(item) = scan::item_from_path(&file) else {
+            return self.open_dir(dir, ctx);
+        };
+        self.reset_state(dir);
+        self.items = vec![item];
+        self.single_file = Some(file);
+        self.rebuild_groups();
+        self.open_viewer(ctx, 0);
     }
 
     // ---------------------------------------------------------------- scan
@@ -428,6 +479,7 @@ impl App {
         let screen = ctx.screen_rect().size() * ctx.pixels_per_point();
         let edge = (screen.max_elem() as u32).clamp(1024, 4096);
         let (tx, rx) = channel();
+        let tx_keep = tx.clone();
         let image_path = path.clone();
         let c = ctx.clone();
 
@@ -459,6 +511,10 @@ impl App {
             tex: None,
             fallback: self.tex.get(&id).map(|t| t.handle.clone()),
             rx,
+            tx: tx_keep,
+            edge,
+            zoom: 1.0,
+            pan: Vec2::ZERO,
             #[cfg(feature = "video-player")]
             player,
 
@@ -501,6 +557,52 @@ impl App {
 
         #[cfg(not(feature = "video-player"))]
         let tex = v.tex.clone().or_else(|| v.fallback.clone());
+
+        // ---- zoom: wheel / pinch / + - 0 (the grid behind is not scrolled, see `update`)
+        let screen = ctx.screen_rect();
+        let fit = tex.as_ref().map(|t| {
+            let ts = t.size_vec2();
+            let avail =
+                Rect::from_min_max(screen.min + vec2(24.0, 24.0), screen.max - vec2(24.0, 90.0))
+                    .size();
+            ts * (avail.x / ts.x).min(avail.y / ts.y)
+        });
+        if let Some(fit) = fit {
+            let it = &self.items[id as usize];
+            let native_w = if it.w > 0 { it.w as f32 } else { fit.x };
+            let max_zoom = (native_w / fit.x * 8.0).clamp(4.0, 64.0);
+            let (pinch, pointer, plus, minus, reset) = ctx.input(|i| {
+                (
+                    i.zoom_delta(),
+                    i.pointer.hover_pos(),
+                    i.key_pressed(Key::Plus) || i.key_pressed(Key::Equals),
+                    i.key_pressed(Key::Minus),
+                    i.key_pressed(Key::Num0),
+                )
+            });
+            let mut k = (self.viewer_scroll * 0.0025).exp() * pinch;
+            if plus {
+                k *= 1.25;
+            }
+            if minus {
+                k /= 1.25;
+            }
+            if reset {
+                v.zoom = 1.0;
+                v.pan = Vec2::ZERO;
+            }
+            if (k - 1.0).abs() > 1e-4 {
+                zoom_at(
+                    &mut v.zoom,
+                    &mut v.pan,
+                    k,
+                    pointer.unwrap_or(screen.center()),
+                    screen,
+                    fit,
+                    max_zoom,
+                );
+            }
+        }
 
         enum Act {
             None,
@@ -614,19 +716,31 @@ impl App {
             .order(egui::Order::Middle)
             .fixed_pos(Pos2::ZERO)
             .show(ctx, |ui| {
-                let screen = ctx.screen_rect();
-                let resp = ui.allocate_rect(screen, Sense::click());
+                let resp = ui.allocate_rect(screen, Sense::click_and_drag());
+                let zoomed = v.zoom > 1.0001;
+                if let Some(fit) = fit {
+                    if zoomed && resp.dragged_by(PointerButton::Primary) {
+                        v.pan += resp.drag_delta();
+                    }
+                    v.pan = clamp_pan(v.pan, fit * v.zoom, screen.size());
+                }
+                // normal cursor, a hand once there is something to move around
+                if zoomed {
+                    if resp.dragged() {
+                        ctx.set_cursor_icon(CursorIcon::Grabbing);
+                    } else if resp.hovered() {
+                        ctx.set_cursor_icon(CursorIcon::Grab);
+                    }
+                    if resp.double_clicked() {
+                        v.zoom = 1.0;
+                        v.pan = Vec2::ZERO;
+                    }
+                }
                 let p = ui.painter();
                 p.rect_filled(screen, 0.0, Color32::from_black_alpha(242));
                 if let Some(t) = &tex {
-                    let ts = t.size_vec2();
-                    let avail = Rect::from_min_max(
-                        screen.min + vec2(24.0, 24.0),
-                        screen.max - vec2(24.0, 90.0),
-                    )
-                    .size();
-                    let s = (avail.x / ts.x).min(avail.y / ts.y);
-                    let r = Rect::from_center_size(screen.center(), ts * s);
+                    let size = fit.unwrap_or(t.size_vec2()) * v.zoom;
+                    let r = Rect::from_center_size(screen.center() + v.pan, size);
                     p.image(
                         t.id(),
                         r,
@@ -666,13 +780,46 @@ impl App {
                     draw_play(p, c, 18.0);
                 }
 
+                let menu_open = resp.context_menu_opened();
+                resp.context_menu(|ui| {
+                    if ui.button("🚀 Open externally").clicked() {
+                        act = Act::External;
+                        ui.close_menu();
+                    }
+                    if ui.button("📂 Show in folder").clicked() {
+                        act = Act::Reveal;
+                        ui.close_menu();
+                    }
+                });
                 if resp.middle_clicked() {
                     reveal_in_file_manager(&self.items[id as usize].path);
-                } else if resp.clicked() {
-                    //act = if is_video { Act::External } else { Act::Close };
+                } else if resp.clicked() && !menu_open && !zoomed {
+                    // (zoomed: clicks are ignored so a stray click doesn't throw the zoom away)
                     act = Act::Close;
                 }
             });
+
+        // Zoomed in on an image: swap the preview for a sharper decode (once).
+        if v.zoom > 1.1 && !is_video {
+            let it = &self.items[id as usize];
+            let max_side = ctx.input(|i| i.max_texture_side) as u32;
+            let want = max_side.min(8192);
+            let src = if it.w > 0 { it.w.max(it.h) } else { u32::MAX };
+            if want > v.edge && src > v.edge {
+                v.edge = want;
+                let (path, kind, tx, c) = (it.path.clone(), it.kind, v.tx.clone(), ctx.clone());
+                std::thread::spawn(move || {
+                    let ci = thumbs::make_image(&path, kind, want).map(|img| {
+                        egui::ColorImage::from_rgb(
+                            [img.width() as usize, img.height() as usize],
+                            img.as_raw(),
+                        )
+                    });
+                    let _ = tx.send(ci);
+                    c.request_repaint();
+                });
+            }
+        }
 
         ctx.input(|i| {
             if i.key_pressed(Key::Escape) {
@@ -702,6 +849,14 @@ impl App {
 
         match act {
             Act::None => {}
+            Act::Close if self.single_file.is_some() => {
+                // Single file mode: now load the folder, scroll to the file, flash it.
+                if let Some(file) = self.single_file.take() {
+                    let dir = file.parent().map(Path::to_path_buf).unwrap_or_default();
+                    self.open_dir(dir, ctx);
+                    self.pending_reveal = Some(file);
+                }
+            }
             Act::Close => {
                 let y = self.layout.y_of.get(id as usize).copied().unwrap_or(0.0);
                 if y < self.scroll_y || y > self.scroll_y + self.view_h * 0.8 {
@@ -853,7 +1008,20 @@ impl App {
             None
         };
         let mut current_rect = None;
+        let mut flash = None;
+        if let Some((fid, t0)) = self.flash {
+            let el = t0.elapsed().as_secs_f32();
+            if el >= FLASH_SECS {
+                self.flash = None;
+            } else {
+                flash = Some((fid, el / FLASH_SECS, None::<Rect>));
+                ctx.request_repaint();
+            }
+        }
         for (id, r) in vis {
+            if let Some(f) = flash.as_mut().filter(|f| f.0 == id) {
+                f.2 = Some(r);
+            }
             let item = &self.items[id as usize];
             let group = self.layout.group_of.get(id as usize).copied().unwrap_or(0);
             if self.layout.compact {
@@ -927,9 +1095,20 @@ impl App {
                     }
                 }
             });
+            let menu_open = resp.context_menu_opened();
+            resp.context_menu(|ui| {
+                if ui.button("🚀 Open externally").clicked() {
+                    open_external(&item.path);
+                    ui.close_menu();
+                }
+                if ui.button("📂 Show in folder").clicked() {
+                    reveal_in_file_manager(&item.path);
+                    ui.close_menu();
+                }
+            });
             if resp.middle_clicked() {
                 reveal_in_file_manager(&item.path);
-            } else if resp.clicked() {
+            } else if resp.clicked() && !menu_open {
                 clicked = Some(id);
             }
             if pointer.map_or(false, |p| r.contains(p)) {
@@ -945,10 +1124,57 @@ impl App {
             let rel = search::rel_path(&self.root, &self.items[id as usize].path);
             search::paint_current(&painter, r, &rel, self.search.words());
         }
+        if let Some((_, t, Some(r))) = flash {
+            paint_flash(&painter, r, t);
+        }
         if let Some(id) = clicked {
             self.open_viewer(&ctx, id);
         }
     }
+}
+
+const FLASH_SECS: f32 = 1.2;
+
+/// "Here it is": a bright frame that holds for a moment, fades out, and sends
+/// a ring outwards. `t` runs 0..1 over the flash.
+fn paint_flash(p: &egui::Painter, r: Rect, t: f32) {
+    let c = search::ACCENT;
+    let hold = 0.6;
+    let fade = if t < hold { 1.0 } else { 1.0 - (t - hold) / (1.0 - hold) };
+    p.rect_filled(r, 0.0, c.gamma_multiply(0.2 * fade));
+    p.rect_stroke(r, 0.0, Stroke::new(3.0_f32, c.gamma_multiply(fade)));
+    let ease = 1.0 - (1.0 - t).powi(3);
+    p.rect_stroke(
+        r.expand(2.0 + 22.0 * ease),
+        4.0 + 8.0 * ease,
+        Stroke::new(2.0_f32, c.gamma_multiply(0.7 * (1.0 - t))),
+    );
+}
+
+/// Keep the zoomed image from being dragged away: while it is larger than the
+/// window it may only move until its edge meets the window edge, otherwise it
+/// stays centred.
+fn clamp_pan(pan: Vec2, size: Vec2, view: Vec2) -> Vec2 {
+    let lim = ((size - view) * 0.5).max(Vec2::ZERO);
+    vec2(pan.x.clamp(-lim.x, lim.x), pan.y.clamp(-lim.y, lim.y))
+}
+
+/// Zoom the viewer image by factor `k`, keeping the point under `anchor` fixed.
+fn zoom_at(
+    zoom: &mut f32,
+    pan: &mut Vec2,
+    k: f32,
+    anchor: Pos2,
+    screen: Rect,
+    fit: Vec2,
+    max_zoom: f32,
+) {
+    let z = (*zoom * k).clamp(1.0, max_zoom);
+    let k = z / *zoom;
+    let rel = anchor - screen.center();
+    *pan = rel - (rel - *pan) * k;
+    *zoom = z;
+    *pan = clamp_pan(*pan, fit * z, screen.size());
 }
 
 fn gap_for(compact: bool) -> f32 {
@@ -1115,6 +1341,17 @@ impl eframe::App for App {
             }
         }
 
+        // The viewer zooms with the wheel; keep the grid underneath from scrolling too.
+        self.viewer_scroll = 0.0;
+        if self.viewer.is_some() {
+            self.viewer_scroll = ctx.input_mut(|i| {
+                let s = i.smooth_scroll_delta.y;
+                i.smooth_scroll_delta = Vec2::ZERO;
+                i.raw_scroll_delta = Vec2::ZERO;
+                s
+            });
+        }
+
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.add_space(3.0);
             ui.horizontal(|ui| {
@@ -1261,6 +1498,20 @@ impl eframe::App for App {
             }
         }
 
+        // Came here from single file mode: once the folder has a layout, jump to the file.
+        if self.pending_reveal.is_some()
+            && !self.groups_dirty
+            && !self.items.is_empty()
+            && self.layout.y_of.len() == self.items.len()
+        {
+            if let Some(file) = self.pending_reveal.take() {
+                if let Some(id) = self.items.iter().position(|it| it.path == file) {
+                    self.reveal_item(id as u32, false, ctx);
+                    self.flash = Some((id as u32, Instant::now()));
+                }
+            }
+        }
+
         self.viewer_ui(ctx);
     }
 }
@@ -1268,15 +1519,24 @@ impl eframe::App for App {
 fn main() -> eframe::Result<()> {
     let args = Args::parse();
 
-    let root = args
-        .dirs
-        .iter()
-        .find(|path| path.is_dir())
-        .cloned()
-        .or_else(|| {
-            directories::UserDirs::new().and_then(|d| d.picture_dir().map(|p| p.to_path_buf()))
-        })
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    // First argument that is a folder, or a supported image/video file (single file mode).
+    let target = args.paths.iter().find_map(|p| {
+        if p.is_dir() {
+            Some((p.clone(), None))
+        } else if p.is_file() && scan::classify(p).is_some() {
+            let abs = std::path::absolute(p).unwrap_or_else(|_| p.clone());
+            let dir = abs.parent().map(Path::to_path_buf).unwrap_or_default();
+            Some((dir, Some(abs)))
+        } else {
+            None
+        }
+    });
+    let (root, single_file) = target.unwrap_or_else(|| {
+        let dir = directories::UserDirs::new()
+            .and_then(|d| d.picture_dir().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        (dir, None)
+    });
 
     let (group_mode, gran) = match args.sort {
         SortMode::Folder => (GroupMode::Folder, DateGran::Month),
@@ -1288,6 +1548,7 @@ fn main() -> eframe::Result<()> {
 
     let config = AppConfig {
         root,
+        single_file,
         width: args.width,
         height: args.height,
         fullscreen: args.fullscreen,
@@ -1322,4 +1583,52 @@ fn main() -> eframe::Result<()> {
         opts,
         Box::new(move |cc| Box::new(App::new(cc, config))),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn screen() -> Rect {
+        Rect::from_min_size(Pos2::ZERO, vec2(1000.0, 800.0))
+    }
+
+    #[test]
+    fn clamp_pan_centres_small_and_limits_large() {
+        // smaller than the window: always centred
+        assert_eq!(
+            clamp_pan(vec2(50.0, -20.0), vec2(600.0, 400.0), vec2(1000.0, 800.0)),
+            Vec2::ZERO
+        );
+        // 2000 wide in a 1000 window: may move 500 either way; height still centred
+        let p = clamp_pan(vec2(900.0, 300.0), vec2(2000.0, 700.0), vec2(1000.0, 800.0));
+        assert_eq!(p, vec2(500.0, 0.0));
+    }
+
+    #[test]
+    fn zoom_keeps_the_point_under_the_cursor_fixed() {
+        let fit = vec2(900.0, 700.0);
+        let (mut z, mut pan) = (1.0, Vec2::ZERO);
+        let anchor = pos2(650.0, 300.0);
+        // image point under the cursor before zooming (relative to image centre)
+        let before = (anchor - screen().center() - pan) / z;
+        zoom_at(&mut z, &mut pan, 3.0, anchor, screen(), fit, 64.0);
+        assert!((z - 3.0).abs() < 1e-5);
+        let after = (anchor - screen().center() - pan) / z;
+        assert!((before - after).length() < 1e-3, "{before:?} vs {after:?}");
+    }
+
+    #[test]
+    fn zoom_is_limited_and_resets_pan_at_fit() {
+        let fit = vec2(900.0, 700.0);
+        let (mut z, mut pan) = (1.0, Vec2::ZERO);
+        zoom_at(&mut z, &mut pan, 1000.0, pos2(10.0, 10.0), screen(), fit, 8.0);
+        assert_eq!(z, 8.0);
+        // pan is within the image bounds
+        let lim = (fit * 8.0 - screen().size()) * 0.5;
+        assert!(pan.x.abs() <= lim.x + 1e-3 && pan.y.abs() <= lim.y + 1e-3);
+        // zoom back out past fit: stays at 1.0 and centred
+        zoom_at(&mut z, &mut pan, 0.0001, pos2(10.0, 10.0), screen(), fit, 8.0);
+        assert_eq!((z, pan), (1.0, Vec2::ZERO));
+    }
 }

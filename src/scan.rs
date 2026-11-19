@@ -72,6 +72,26 @@ pub fn classify(p: &Path) -> Option<Kind> {
     }
 }
 
+/// Build an `Item` for one file (single file mode). Dimensions stay 0 until probed.
+pub fn item_from_path(path: &Path) -> Option<Item> {
+    let kind = classify(path)?;
+    let md = fs::metadata(path).ok()?;
+    if !md.is_file() {
+        return None;
+    }
+    let modified = secs(md.modified()).unwrap_or(0);
+    let created = secs(md.created()).unwrap_or(modified);
+    Some(Item {
+        path: path.to_path_buf(),
+        kind,
+        modified,
+        created,
+        size: md.len(),
+        w: 0,
+        h: 0,
+    })
+}
+
 fn secs(t: std::io::Result<std::time::SystemTime>) -> Option<i64> {
     let d = t.ok()?.duration_since(UNIX_EPOCH).ok()?;
     Some(d.as_secs() as i64)

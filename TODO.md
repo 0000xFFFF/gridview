@@ -1,2 +1,1 @@
 - update preview/preview.gif
-- package the install.sh / uninstall.sh scripts inside releases

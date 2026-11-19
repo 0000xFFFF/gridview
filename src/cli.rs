@@ -39,9 +39,10 @@ pub struct Args {
     #[arg(short = 'C', long)]
     pub compact: bool,
 
-    /// Directory to open
-    #[arg(value_name = "DIR", num_args = 0..)]
-    pub dirs: Vec<PathBuf>,
+    /// Directory to open, or a single image/video file to view
+    /// (Esc then loads the file's folder and scrolls to it)
+    #[arg(value_name = "PATH", num_args = 0..)]
+    pub paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

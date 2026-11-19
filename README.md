@@ -40,6 +40,9 @@ cargo build --release
 No ffmpeg dev libs? `cargo build --release --no-default-features` (no video thumbnails).
 
 ## Install
+From a release tarball (Linux): unpack it and run `./install.sh` (`./uninstall.sh` removes it again).
+
+From source:
 ```
 ./install.sh
 ```
@@ -51,6 +54,8 @@ No ffmpeg dev libs? `cargo build --release --no-default-features` (no video thum
 - Compact checkbox (top bar) or `-C` / `--compact`: packs small groups side by side, each group gets its own gray shade, hover a tile to see its group name
 - Find: `Ctrl+F` or the 🔍 Find button (top right) opens a search box. It matches the path relative to the opened folder (sub directories included); the query is split into words and every word must occur, in any order, case-insensitive. Matches are outlined, everything else is dimmed. `Enter` / `Shift+Enter` (or `F3` / `Shift+F3`, or the ▲ ▼ buttons) jump to the next / previous hit, `Esc` closes it
 - Hover a tile to see its relative path
-- Click a tile for the viewer: Left/Right = prev/next, Esc = close, Enter = open in system player
+- Single file mode: `gridview photo.jpg` (or open a file with it from your file manager, the desktop entry is registered for every supported image/video type) shows just that file. `Esc` then loads its folder, scrolls to the file and highlights it for a moment
+- Click a tile for the viewer: Left/Right = prev/next, Esc = close, Enter = open in system player. Mouse wheel (or pinch, or `+` / `-`) zooms towards the cursor, `0` or a double click resets; once zoomed in, drag to move around (the cursor turns into a hand)
+- Right click a tile, or the viewer, for Open externally / Show in folder
 
 Cache lives in `~/.cache/gridview` (thumbnails + image sizes); delete it any time.
