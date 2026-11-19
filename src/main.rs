@@ -204,7 +204,6 @@ impl App {
     }
 
     fn open_dir(&mut self, root: PathBuf, ctx: &egui::Context) {
-
         let title = format!("gridview - {}", root.to_string_lossy());
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
 
@@ -568,6 +567,10 @@ impl App {
                 ctx.request_repaint_after(v.autohide.time_left(now));
             }
             let fade = ctx.animate_bool_with_time(Id::new("viewer_transport_fade"), show, 0.18);
+
+            if !show && fade <= 0.0 {
+                ctx.set_cursor_icon(egui::CursorIcon::None);
+            }
 
             let area = egui::Area::new(Id::new("viewer_transport"))
                 .order(egui::Order::Foreground)
