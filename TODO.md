@@ -1,3 +1,2 @@
-- need to clean up code
-    - move all until type of function to util.rs
+- add transparency background pattern
 - update preview/preview.gif
