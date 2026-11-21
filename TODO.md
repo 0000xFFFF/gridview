@@ -1,2 +1,3 @@
+- if drive is encrypted we need to gen cache inside the drive
 - add transparency background pattern
 - update preview/preview.gif
