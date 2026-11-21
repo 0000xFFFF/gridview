@@ -15,6 +15,8 @@ use walkdir::WalkDir;
 
 use rayon::prelude::*;
 
+use crate::cache;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
     Image,
@@ -105,27 +107,23 @@ struct CacheEntry {
     h: u32,
 }
 
-pub fn cache_dir() -> PathBuf {
-    directories::ProjectDirs::from("", "", "gridview")
-        .map(|d| d.cache_dir().to_path_buf())
-        .unwrap_or_else(|| std::env::temp_dir().join("gridview-cache"))
+/// The size cache of one cache location (see `cache`): files on an encrypted
+/// drive are cached on that drive, so each location has its own.
+fn dims_cache_path(dir: &Path) -> PathBuf {
+    dir.join("dims.bin")
 }
 
-fn dims_cache_path() -> PathBuf {
-    cache_dir().join("dims.bin")
-}
-
-fn load_dims_cache() -> HashMap<String, CacheEntry> {
-    fs::read(dims_cache_path())
+fn load_dims_cache(dir: &Path) -> HashMap<String, CacheEntry> {
+    fs::read(dims_cache_path(dir))
         .ok()
         .and_then(|b| bincode::deserialize(&b).ok())
         .unwrap_or_default()
 }
 
-fn save_dims_cache(map: &HashMap<String, CacheEntry>) {
-    let _ = fs::create_dir_all(cache_dir());
+fn save_dims_cache(dir: &Path, map: &HashMap<String, CacheEntry>) {
+    let _ = fs::create_dir_all(dir);
     if let Ok(b) = bincode::serialize(map) {
-        let _ = fs::write(dims_cache_path(), b);
+        let _ = fs::write(dims_cache_path(dir), b);
     }
 }
 
@@ -220,9 +218,29 @@ pub fn spawn_scan(root: PathBuf, ctx: eframe::egui::Context) -> ScanHandle {
         let _ = tx.send(ScanMsg::Walked(items));
         ctx.request_repaint();
 
-        // ---- 2. probe dimensions in parallel, using the on-disk cache ----
-        let cache = load_dims_cache();
-        let fresh: Mutex<HashMap<String, CacheEntry>> = Mutex::new(HashMap::new());
+        // ---- 2. probe dimensions in parallel, using the on-disk caches ----
+        // Every file belongs to a cache location (usually the one in ~/.cache,
+        // but files on an encrypted drive are cached on that drive).
+        let mut loc_dirs: Vec<PathBuf> = Vec::new();
+        let mut loc_index: HashMap<PathBuf, usize> = HashMap::new();
+        let probe_list: Vec<(u32, PathBuf, Kind, i64, u64, Option<usize>)> = probe_list
+            .into_iter()
+            .map(|(id, p, kind, mt, sz)| {
+                let loc = cache::dir_for(&p).map(|d| {
+                    *loc_index.entry(d.clone()).or_insert_with(|| {
+                        loc_dirs.push(d);
+                        loc_dirs.len() - 1
+                    })
+                });
+                (id, p, kind, mt, sz, loc)
+            })
+            .collect();
+        let caches: Vec<HashMap<String, CacheEntry>> =
+            loc_dirs.iter().map(|d| load_dims_cache(d)).collect();
+        let fresh: Vec<Mutex<HashMap<String, CacheEntry>>> = loc_dirs
+            .iter()
+            .map(|_| Mutex::new(HashMap::new()))
+            .collect();
         let threads = (std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(4)
@@ -236,29 +254,39 @@ pub fn spawn_scan(root: PathBuf, ctx: eframe::egui::Context) -> ScanHandle {
             probe_list.par_chunks(128).for_each(|chunk| {
                 let mut out = Vec::with_capacity(chunk.len());
                 let mut local = Vec::new();
-                for (id, p, kind, mt, sz) in chunk {
+                for (id, p, kind, mt, sz, loc) in chunk {
                     let key = p.to_string_lossy().into_owned();
-                    let (w, h) = match cache.get(&key) {
-                        Some(e) if e.mtime == *mt && e.size == *sz => (e.w, e.h),
-                        _ => probe(p, *kind),
+                    let hit = loc
+                        .and_then(|l| caches[l].get(&key))
+                        .filter(|e| e.mtime == *mt && e.size == *sz);
+                    let (w, h) = match hit {
+                        Some(e) => (e.w, e.h),
+                        None => probe(p, *kind),
                     };
-                    local.push((
-                        key,
-                        CacheEntry {
-                            mtime: *mt,
-                            size: *sz,
-                            w,
-                            h,
-                        },
-                    ));
+                    if let Some(l) = loc {
+                        local.push((
+                            *l,
+                            key,
+                            CacheEntry {
+                                mtime: *mt,
+                                size: *sz,
+                                w,
+                                h,
+                            },
+                        ));
+                    }
                     out.push((*id, w, h));
                 }
-                fresh.lock().unwrap().extend(local);
+                for (l, key, entry) in local {
+                    fresh[l].lock().unwrap().insert(key, entry);
+                }
                 let _ = tx.send(ScanMsg::Dims(out));
                 ctx.request_repaint();
             });
         });
-        save_dims_cache(&fresh.into_inner().unwrap());
+        for (dir, map) in loc_dirs.iter().zip(fresh) {
+            save_dims_cache(dir, &map.into_inner().unwrap());
+        }
         let _ = tx.send(ScanMsg::Done);
         ctx.request_repaint();
     });

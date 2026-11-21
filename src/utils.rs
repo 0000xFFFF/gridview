@@ -309,29 +309,31 @@ mod tests {
 
     #[test]
     fn controls_hide_when_the_pointer_is_still_and_show_on_movement() {
+        // relative to DELAY so retuning it doesn't break the test
+        let d = AutoHide::DELAY;
         let t0 = Instant::now();
-        let ms = |n| t0 + Duration::from_millis(n);
         let mut h = AutoHide::new(t0);
         assert!(
-            h.update(ms(0), false, false, false),
+            h.update(t0, false, false, false),
             "visible right after opening"
         );
         assert!(
-            h.update(ms(1000), false, false, false),
+            h.update(t0 + d / 2, false, false, false),
             "still within the delay"
         );
         assert!(
-            !h.update(ms(1600), false, false, false),
+            !h.update(t0 + d * 2, false, false, false),
             "hidden once stationary"
         );
-        assert!(!h.update(ms(60_000), false, false, false), "stays hidden");
+        let later = t0 + Duration::from_secs(60);
+        assert!(!h.update(later, false, false, false), "stays hidden");
         assert!(
-            h.update(ms(60_010), true, false, false),
+            h.update(later + Duration::from_millis(10), true, false, false),
             "moving brings it back"
         );
-        assert!(h.update(ms(61_000), false, false, false));
+        assert!(h.update(later + d / 2, false, false, false));
         assert!(
-            !h.update(ms(61_600), false, false, false),
+            !h.update(later + d * 2, false, false, false),
             "and it hides again"
         );
     }
@@ -365,14 +367,12 @@ mod tests {
 
     #[test]
     fn time_left_counts_down_to_zero() {
+        let d = AutoHide::DELAY;
         let t0 = Instant::now();
         let mut h = AutoHide::new(t0);
         h.update(t0, true, false, false);
-        assert_eq!(h.time_left(t0), AutoHide::DELAY);
-        assert_eq!(
-            h.time_left(t0 + Duration::from_millis(500)),
-            Duration::from_millis(1000)
-        );
+        assert_eq!(h.time_left(t0), d);
+        assert_eq!(h.time_left(t0 + d / 2), d / 2);
         assert_eq!(h.time_left(t0 + Duration::from_secs(10)), Duration::ZERO);
     }
 

@@ -4,15 +4,18 @@ mod layout;
 #[cfg(feature = "video-player")]
 mod player;
 
+mod cache;
 mod cli;
 mod config;
+#[cfg(target_os = "linux")]
+mod encryption;
 
 use crate::globals::{
     DateGran, GroupMode, Tex, APP_NAME, SLIDER_COLUMNS_MAX, SLIDER_COLUMNS_MIN, TEX_BUDGET_BYTES,
 };
 
 use clap::Parser;
-use cli::{Args, SortMode};
+use cli::{Args, CacheMode, SortMode};
 use config::AppConfig;
 
 mod scan;
@@ -178,6 +181,8 @@ impl App {
 
     /// Forget everything about the previous folder / file.
     fn reset_state(&mut self, root: PathBuf) {
+        // a drive may have been unlocked / unmounted since the last folder
+        cache::reset();
         self.pending_reveal = None;
         self.flash = None;
         self.single_file = None;
@@ -1318,6 +1323,11 @@ impl eframe::App for App {
 
 fn main() -> eframe::Result<()> {
     let args = Args::parse();
+    cache::set_policy(match args.cache {
+        CacheMode::Auto => cache::Policy::Auto,
+        CacheMode::Central => cache::Policy::Central,
+        CacheMode::Drive => cache::Policy::Drive,
+    });
 
     // First argument that is a folder, or a supported image/video file (single file mode).
     let target = args.paths.iter().find_map(|p| {

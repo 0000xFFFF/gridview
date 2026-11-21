@@ -58,4 +58,10 @@ From source:
 - Click a tile for the viewer: Left/Right = prev/next, Esc = close, Enter = open in system player. Mouse wheel (or pinch, or `+` / `-`) zooms towards the cursor, `0` or a double click resets; once zoomed in, drag to move around (the cursor turns into a hand)
 - Right click a tile, or the viewer, for Open externally / Show in folder
 
-Cache lives in `~/.cache/gridview` (thumbnails + image sizes); delete it any time.
+Cache (thumbnails + image sizes) lives in `~/.cache/gridview`; delete it any time.
+
+Files on an **encrypted drive** (LUKS/dm-crypt incl. LVM or RAID on top of it, VeraCrypt, eCryptfs, gocryptfs, ...) are cached on that drive instead, in `<mount point>/.gridview-cache`, so thumbnails and file names never leak to the unencrypted system drive. If the drive isn't writable nothing is cached for it. Choose the behaviour with `--cache`:
+
+- `auto` (default): on the drive only when it is detected as encrypted (detection is Linux-only)
+- `drive`: always on the drive the files are on (use this for BitLocker/fscrypt/ZFS encryption, which aren't detected)
+- `central`: always in `~/.cache/gridview`

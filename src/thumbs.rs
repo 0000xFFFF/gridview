@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
 
+use crate::cache;
 use crate::scan::{self, Kind};
 
 pub const TIERS: [u32; 3] = [256, 512, 1024];
@@ -140,22 +141,27 @@ fn fnv(bytes: &[u8], mut h: u64) -> u64 {
     h
 }
 
-fn cache_path(r: &Req) -> PathBuf {
+/// Where the cached thumbnail of `r` lives. For files on an encrypted drive that
+/// is on the drive itself; `None` means "don't cache this one".
+fn cache_path(r: &Req) -> Option<PathBuf> {
     let mut h = 0xcbf29ce484222325u64;
     h = fnv(r.path.to_string_lossy().as_bytes(), h);
     h = fnv(&r.mtime.to_le_bytes(), h);
     h = fnv(&r.size.to_le_bytes(), h);
-    scan::cache_dir()
-        .join("thumbs")
-        .join(format!("{:016x}_{}.jpg", h, r.tier))
+    Some(
+        cache::dir_for(&r.path)?
+            .join("thumbs")
+            .join(format!("{:016x}_{}.jpg", h, r.tier)),
+    )
 }
 
 fn load_thumb(r: &Req) -> Option<RgbImage> {
     let cp = cache_path(r);
-    if let Some(img) = decode_jpeg(&cp, u32::MAX) {
+    if let Some(img) = cp.as_ref().and_then(|cp| decode_jpeg(cp, u32::MAX)) {
         return Some(img);
     }
     let img = make_image(&r.path, r.kind, r.tier)?;
+    let cp = cp?; // no cache location: just hand out the thumbnail
     if let Some(dir) = cp.parent() {
         let _ = fs::create_dir_all(dir);
     }
